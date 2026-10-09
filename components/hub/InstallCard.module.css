@@ -57,3 +57,13 @@
   border-radius: 8px;
   color: var(--muted);
 }
+
+.how {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffd23f;
+}
