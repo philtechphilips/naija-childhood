@@ -1,0 +1,107 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.guest {
+  box-shadow:
+    0 7px 0 #0b110d,
+    0 0 40px -14px #ffd23f,
+    inset 0 2px 0 rgba(255, 255, 255, 0.08);
+}
+
+.row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #3a1d03;
+  background: radial-gradient(circle at 35% 30%, #fff1a1, #ffc21f);
+  border: 3px solid #0b110d;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.text strong {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 400;
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+
+.text .email {
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.text span {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffd23f;
+}
+
+.field input {
+  height: 46px;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 16px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  outline: none;
+}
+
+.field input:focus {
+  border-color: #ffd23f;
+}
+
+.note {
+  font-size: 13px;
+  color: #7ee08a;
+}
+
+.error {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--danger);
+}

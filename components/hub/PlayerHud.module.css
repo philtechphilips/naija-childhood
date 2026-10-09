@@ -1,0 +1,106 @@
+.hud {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45));
+}
+
+.ringAvatar {
+  position: absolute;
+  inset: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.levelPill {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  min-width: 26px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #fff1a1, #ffc21f);
+  border: 2px solid #3a1d03;
+  color: #3a1d03;
+  font-family: var(--font-display), sans-serif;
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.badgeText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.badgeText strong {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 400;
+  font-size: 19px;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40vw;
+}
+
+.badgeText span {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffd23f;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 12px 0 9px;
+  border-radius: 12px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 17px;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(40, 52, 46, 0.92), rgba(16, 22, 19, 0.92));
+  border: 2px solid rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.chipFire svg {
+  color: #ff8a3d;
+}
+
+.chipStar svg {
+  color: #ffd23f;
+}
+

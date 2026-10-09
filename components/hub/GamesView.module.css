@@ -1,0 +1,83 @@
+.grid {
+  display: grid;
+  gap: 22px;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 26px;
+  }
+}
+
+/* ------------------------------------------------------------ locked games */
+.roadmap {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.locked {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 10px 14px;
+  border-radius: 18px;
+  text-align: center;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.035) 0 10px, transparent 10px 20px),
+    linear-gradient(180deg, rgba(36, 48, 42, 0.92), rgba(15, 21, 18, 0.95));
+  border: 3px solid rgba(0, 0, 0, 0.7);
+  box-shadow:
+    0 5px 0 rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.07);
+}
+
+.locked strong {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 400;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.lock {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #ffd23f;
+  background: radial-gradient(circle at 35% 30%, #4a5a51, #1a231e);
+  border: 3px solid rgba(0, 0, 0, 0.65);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+
+.soon {
+  position: absolute;
+  top: 10px;
+  right: -26px;
+  width: 92px;
+  padding: 2px 0;
+  transform: rotate(35deg);
+  text-align: center;
+  font-family: var(--font-display), sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2a1503;
+  background: #ffc53d;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}

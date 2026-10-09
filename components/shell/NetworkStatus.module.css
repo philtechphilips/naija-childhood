@@ -1,0 +1,20 @@
+.pill {
+  position: fixed;
+  z-index: 60;
+  top: calc(12px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  background: rgba(30, 22, 18, 0.92);
+  border: 1px solid rgba(255, 107, 90, 0.4);
+  color: #ffd0c8;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  animation: rise-in 0.4s var(--ease-out) both;
+}

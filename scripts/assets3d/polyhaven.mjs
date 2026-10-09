@@ -1,0 +1,35 @@
+// Poly Haven (CC0) props and surface textures used to build the street.
+export const PROPS = [
+  { id: "portable_generator", simplify: 0.35 },
+  { id: "plastic_jerrycan" },
+  { id: "plastic_crate_01", simplify: 0.35 },
+  { id: "plastic_monobloc_chair_01", simplify: 0.5 },
+  { id: "old_tyre" },
+  { id: "small_lpg_tank", simplify: 0.4 },
+  { id: "pot_enamel_01", simplify: 0.4 },
+  { id: "wicker_basket_01", simplify: 0.3 },
+  { id: "wooden_crate_01" },
+  { id: "barrel_03" },
+  { id: "rollershutter_door", tex: 1024 },
+  { id: "street_lamp_01", simplify: 0.3 },
+  { id: "covered_car", tex: 1024 },
+  { id: "large_iron_gate", simplify: 0.4, tex: 1024 },
+  { id: "bananas", simplify: 0.4 },
+  { id: "shrub_01", simplify: 0.3 },
+  { id: "utility_box_01" },
+  { id: "wooden_stool_01" },
+];
+
+export const TEXTURES = [
+  { id: "red_laterite_soil_stones" },
+  { id: "road_damaged" },
+  { id: "dirty_concrete" },
+  { id: "concrete_block_wall" },
+  { id: "painted_plaster_wall" },
+  { id: "peeling_painted_wall" },
+  { id: "beige_wall_001" },
+  { id: "rusty_corrugated_iron" },
+  { id: "corrugated_iron_02" },
+  { id: "patterned_paving_02" },
+  { id: "rusted_shutter", size: 512 },
+];

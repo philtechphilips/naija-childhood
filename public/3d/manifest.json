@@ -1,0 +1,126 @@
+{
+  "avatars": [
+    {
+      "id": "tunde",
+      "name": "Tunde",
+      "kind": "child",
+      "sex": "m",
+      "rig": "Bip02"
+    },
+    {
+      "id": "emeka",
+      "name": "Emeka",
+      "kind": "child",
+      "sex": "m",
+      "rig": "Bip02"
+    },
+    {
+      "id": "ada",
+      "name": "Ada",
+      "kind": "child",
+      "sex": "f",
+      "rig": "Bip02"
+    },
+    {
+      "id": "aisha",
+      "name": "Aisha",
+      "kind": "child",
+      "sex": "f",
+      "rig": "Bip02"
+    },
+    {
+      "id": "police",
+      "name": "Sergeant",
+      "kind": "adult",
+      "sex": "m",
+      "rig": "Bip01"
+    },
+    {
+      "id": "man1",
+      "name": "Chuka",
+      "kind": "adult",
+      "sex": "m",
+      "rig": "Bip01"
+    },
+    {
+      "id": "man2",
+      "name": "Musa",
+      "kind": "adult",
+      "sex": "m",
+      "rig": "Bip01"
+    },
+    {
+      "id": "man3",
+      "name": "Segun",
+      "kind": "adult",
+      "sex": "m",
+      "rig": "Bip01"
+    },
+    {
+      "id": "woman1",
+      "name": "Hauwa",
+      "kind": "adult",
+      "sex": "f",
+      "rig": "Bip01"
+    },
+    {
+      "id": "woman2",
+      "name": "Ngozi",
+      "kind": "adult",
+      "sex": "f",
+      "rig": "Bip01"
+    }
+  ],
+  "anims": [
+    "idle_m",
+    "idle_f",
+    "look_m",
+    "clap_f",
+    "clap_m",
+    "cheer_f",
+    "cheer_m",
+    "talk_m",
+    "talk_f",
+    "phone_m",
+    "sit_m",
+    "sit_f",
+    "crouch_m",
+    "walk_m",
+    "walk_f",
+    "run_m",
+    "run_f"
+  ],
+  "props": [
+    "portable_generator",
+    "plastic_jerrycan",
+    "plastic_crate_01",
+    "plastic_monobloc_chair_01",
+    "old_tyre",
+    "small_lpg_tank",
+    "pot_enamel_01",
+    "wicker_basket_01",
+    "wooden_crate_01",
+    "barrel_03",
+    "rollershutter_door",
+    "street_lamp_01",
+    "covered_car",
+    "large_iron_gate",
+    "bananas",
+    "shrub_01",
+    "utility_box_01",
+    "wooden_stool_01"
+  ],
+  "textures": [
+    "red_laterite_soil_stones",
+    "road_damaged",
+    "dirty_concrete",
+    "concrete_block_wall",
+    "painted_plaster_wall",
+    "peeling_painted_wall",
+    "beige_wall_001",
+    "rusty_corrugated_iron",
+    "corrugated_iron_02",
+    "patterned_paving_02",
+    "rusted_shutter"
+  ]
+}

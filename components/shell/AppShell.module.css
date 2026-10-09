@@ -1,0 +1,14 @@
+.shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+}
+
+.main {
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 34px);
+}
+
+.shell[data-immersive="true"] .main {
+  padding-bottom: 0;
+}
+

@@ -1,0 +1,49 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 28px;
+  background:
+    radial-gradient(60% 40% at 50% 40%, rgba(31, 164, 99, 0.16), transparent 70%),
+    var(--bg);
+}
+
+.mark {
+  transform: scale(1.5);
+  animation: pop-in 0.5s var(--ease-out) both;
+}
+
+.dots {
+  display: flex;
+  gap: 8px;
+}
+
+.dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sun);
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}

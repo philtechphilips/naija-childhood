@@ -1,0 +1,101 @@
+/* Chunky, pressable game buttons: thick bottom edge, inner highlight, press-down on tap. */
+.btn {
+  --edge: rgba(0, 0, 0, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 16px;
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  user-select: none;
+  position: relative;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 5px 0 var(--edge),
+    0 10px 18px -6px rgba(0, 0, 0, 0.55),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.28);
+  transition:
+    transform 0.08s ease-out,
+    box-shadow 0.08s ease-out,
+    filter 0.15s;
+  transform: translateY(0);
+}
+
+.btn:hover {
+  filter: brightness(1.06);
+}
+
+.btn:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 var(--edge),
+    0 4px 10px -4px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  filter: grayscale(0.4);
+}
+
+.md {
+  min-height: 48px;
+  padding: 0 20px;
+  font-size: 18px;
+}
+
+.sm {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+.lg {
+  min-height: 62px;
+  padding: 0 28px;
+  font-size: 23px;
+  border-radius: 20px;
+}
+
+.block {
+  width: 100%;
+}
+
+.primary {
+  --edge: #0a5a30;
+  background: linear-gradient(180deg, #4be38f 0%, #1fb866 45%, #14974f 100%);
+  color: #fff;
+}
+
+.sun {
+  --edge: #b05f00;
+  background: linear-gradient(180deg, #fff1a1 0%, #ffcf33 40%, #ffa51c 100%);
+  color: #3a1d03;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.secondary {
+  --edge: #0b0f0d;
+  background: linear-gradient(180deg, #3a4a42 0%, #26322c 100%);
+  color: var(--text);
+}
+
+.ghost {
+  --edge: transparent;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text);
+  text-shadow: none;
+}
+
+.ghost:active {
+  box-shadow: none;
+}
