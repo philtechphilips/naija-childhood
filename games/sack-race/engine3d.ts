@@ -8,7 +8,7 @@ import { createOverlay, drawLoading } from "@/games/core3d/overlay";
 import { buildPlace, type Place } from "@/games/core3d/places";
 import { createWatchers, faceToward } from "@/games/core3d/kids";
 import { HOUSES, banner, bunting, canopy, chalkLine, finishTape } from "@/games/core3d/sportsday";
-import { HOP, LANES, createRace, hurdleAhead, inMud, type Difficulty, type RaceEvent } from "./rules";
+import { HOP, LANES, LEVELS, createRace, hurdleAhead, inMud, type Difficulty, type RaceEvent } from "./rules";
 import { RACERS, PLAYER_LANE, bindHopKeys, courseOf, createCommentary, raceResult, ordinal } from "./shared";
 import { createNaijaMusic } from "@/games/core/naija-music";
 
@@ -477,18 +477,28 @@ export function createSackRace3D(ctx: EngineContext): GameEngine {
     for (const c of crowd) c.update(frameDt);
     place?.update(frameDt, stage.camera.position);
 
-    // TV-style tracking camera from the near side of the track; it pulls back a touch when you have ginger.
+    // Camera follows YOUR racer. Wide screens: side-on TV shot. Tall phone screens: a chase shot from
+    // behind and beside you, so you and the lanes ahead stay in view. Pulls back a touch on ginger.
     const me = race.racers[PLAYER_LANE]!;
-    const lead = Math.max(...race.racers.map((r) => r.x));
-    // Stops short of the classroom block at the end of the field.
-    const focus = Math.min(17, START_X + lerp(me.x, lead, 0.25));
+    const px = START_X + me.x;
+    const aspect = overlay.w / Math.max(1, overlay.h);
+    const portrait = clamp((1.3 - aspect) / 0.8, 0, 1);
     const back = me.ginger ? 0.5 : 0;
-    cam.lerp(new THREE.Vector3(focus - 0.6 - back, 1.85 + back * 0.3, -6.4 - back), Math.min(1, frameDt * 3));
-    look.lerp(new THREE.Vector3(focus + 1.8, 0.75, laneZ(1.5)), Math.min(1, frameDt * 4));
+    // The side shot stops short of the classroom block at the end of the field.
+    const sideX = Math.min(17, px);
+    const wantCam = new THREE.Vector3(sideX + 0.4 - back, 1.85 + back * 0.3, -6.4 - back).lerp(new THREE.Vector3(px - 3.4 - back, 2.2 + back * 0.3, laneZ(PLAYER_LANE) - 2.9), portrait);
+    const wantLook = new THREE.Vector3(sideX + 1.6, 0.75, laneZ(1.5)).lerp(new THREE.Vector3(px + 2.8, 0.55, laneZ(PLAYER_LANE) + 0.9), portrait);
+    cam.lerp(wantCam, Math.min(1, frameDt * 4));
+    look.lerp(wantLook, Math.min(1, frameDt * 5));
+    const fov = 55 + portrait * 8;
+    if (Math.abs(stage.camera.fov - fov) > 0.1) {
+      stage.camera.fov = fov;
+      stage.camera.updateProjectionMatrix();
+    }
     stage.camera.position.copy(cam);
     if (shake > 0) stage.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
     stage.camera.lookAt(look);
-    stage.focusShadows(new THREE.Vector3(focus + 2, 0, 0));
+    stage.focusShadows(new THREE.Vector3(px + 2, 0, laneZ(PLAYER_LANE)));
     stage.render();
     drawHud(clock);
   }
@@ -523,6 +533,35 @@ export function createSackRace3D(ctx: EngineContext): GameEngine {
       }
     }
 
+    // Hop meter: fills while you're in the air; press HOP when it's in the yellow zone (the landing).
+    // Works even when you can't see your feet.
+    if (clock >= 0 && me.state !== "done" && me.state !== "fallen") {
+      const span = 1.3; // the bar shows 0..130% of the hop
+      const mw = Math.min(W * 0.78, 320);
+      const mx = (W - mw) / 2;
+      const my = H - 58;
+      const u = me.state === "air" ? clamp((clock - me.t0) / me.air, 0, span) : me.state === "ground" ? clamp(1 + landed / me.air, 1, span) : 0;
+      const win = (HOP.window.good * LEVELS[difficulty].window) / Math.max(0.2, me.air);
+      const zone0 = clamp(1 - win, 0, span) / span;
+      const zone1 = clamp(1 + win, 0, span) / span;
+      const leapCue = obstacles && hurdleAhead(course, me, me.state === "air" ? me.toX : me.x) !== null;
+      const inZone = u / span >= zone0 && u / span <= zone1 && me.state !== "ready";
+      roundRect(g, mx - 8, my - 8, mw + 16, 34, 14);
+      g.fillStyle = "rgba(10,14,12,0.72)";
+      g.fill();
+      roundRect(g, mx + zone0 * mw, my - 2, (zone1 - zone0) * mw, 22, 8);
+      g.fillStyle = leapCue ? "rgba(178,102,255,0.55)" : "rgba(255,209,102,0.45)";
+      g.fill();
+      roundRect(g, mx, my + 4, Math.max(6, (u / span) * mw), 10, 5);
+      g.fillStyle = inZone ? (leapCue ? LEAP_CUE : "#ffd166") : "#7ee08a";
+      g.fill();
+      // Landing line
+      g.fillStyle = "#fff";
+      g.fillRect(mx + mw / span - 1, my - 4, 2, 26);
+      const label = me.state === "ready" ? "Tap HOP to start" : inZone ? (leapCue ? "LEAP!" : "HOP NOW!") : me.state === "air" ? "in the air…" : "HOP!";
+      hudText(g, label, W / 2, my - 18, { size: inZone ? 22 : 15, font: font.display, color: inZone ? (leapCue ? LEAP_CUE : "#ffd166") : "#fff", stroke: "rgba(0,0,0,0.6)", strokeWidth: 4 });
+    }
+
     // Race progress bar with every house, and the obstacles on it.
     const bw = Math.min(W - 140, 420);
     const bx = (W - bw) / 2;
@@ -554,7 +593,9 @@ export function createSackRace3D(ctx: EngineContext): GameEngine {
       }
     });
     const t = Math.max(0, me.finishTime ?? clock);
-    hudText(g, `${t.toFixed(2)}s`, W - 16, by + 6, { size: 18, font: font.display, color: "#fff", align: "right", shadow: false });
+    // Narrow screens: the timer sits under the bar (opposite your place) so it doesn't cover the finish flag.
+    const narrow = W < 560;
+    hudText(g, `${t.toFixed(2)}s`, W - 16, narrow ? by + 52 : by + 6, { size: narrow ? 22 : 18, font: font.display, color: "#fff", align: "right", shadow: false, ...(narrow ? { stroke: "rgba(0,0,0,0.5)" } : {}) });
     if (clock > 0) {
       hudText(g, ordinal(race.standing(PLAYER_LANE)), 16, by + 52, { size: 26, font: font.display, color: "#ffd166", align: "left", stroke: "rgba(0,0,0,0.5)" });
       // Streak pips: fill four for GINGER.

@@ -50,6 +50,21 @@ export function wallMat(paint: string, peeling: boolean) {
   return m;
 }
 
+/**
+ * Shared materials: identical-looking parts reuse one material, so they can be
+ * merged and drawn together instead of one draw call each.
+ */
+const shared = new Map<string, THREE.Material>();
+function sharedMat<T extends THREE.Material>(key: string, make: () => T): T {
+  let m = shared.get(key);
+  if (!m) {
+    m = make();
+    shared.set(key, m);
+  }
+  return m as T;
+}
+const GOODS_MAT = new THREE.MeshStandardMaterial({ roughness: 0.45 });
+
 let grimeTex: THREE.CanvasTexture | null = null;
 /** Rain-splash grime at the foot of walls: a vertical gradient decal. */
 export function grime() {
@@ -99,7 +114,7 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
   if (upperH > 0) addMesh(g, boxWorldUV(w, upperH, d, 2.5), wall, 0, GROUND_H + upperH / 2, -d / 2);
   addMesh(g, boxWorldUV(w, GROUND_H, d - shopDepth, 2.5), wall, 0, GROUND_H / 2, -shopDepth - (d - shopDepth) / 2);
   // Floor slab band between storeys
-  const band = new THREE.MeshStandardMaterial({ color: new THREE.Color(spec.paint).multiplyScalar(0.82), roughness: 0.9 });
+  const band = sharedMat(`band|${spec.paint}`, () => new THREE.MeshStandardMaterial({ color: new THREE.Color(spec.paint).multiplyScalar(0.82), roughness: 0.9 }));
   addMesh(g, new THREE.BoxGeometry(w + 0.1, 0.22, 0.12), band, 0, GROUND_H, 0.03);
 
   // Shopfronts
@@ -112,6 +127,9 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
     addMesh(g, boxWorldUV(pillarW, GROUND_H, shopDepth, 2.5), wall, x, GROUND_H / 2, -shopDepth / 2);
   }
   const shutter = detailed ? await instantiateProp("rollershutter_door") : null;
+  // Every shelf item in the building goes into one instanced mesh (one draw call).
+  const goodsAt: THREE.Matrix4[] = [];
+  const goodsColor: THREE.Color[] = [];
   for (let i = 0; i < shops; i++) {
     const cx = -w / 2 + pillarW + openW / 2 + i * bay;
     // Dim interior: floor, back wall, shelves stocked with goods.
@@ -122,14 +140,10 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
       const shelfMat = MAT.woodDark;
       for (let s = 0; s < 3; s++) {
         addMesh(g, new THREE.BoxGeometry(openW - 0.3, 0.04, 0.45), shelfMat, cx, 0.6 + s * 0.6, -shopDepth + 0.3, false);
-        const goods = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.24, 0.14), new THREE.MeshStandardMaterial({ roughness: 0.45 }), 10);
-        const m4 = new THREE.Matrix4();
         for (let k = 0; k < 10; k++) {
-          m4.makeTranslation(cx - openW / 2 + 0.35 + (k / 10) * (openW - 0.6), 0.74 + s * 0.6, -shopDepth + 0.3);
-          goods.setMatrixAt(k, m4);
-          goods.setColorAt(k, new THREE.Color(pick(rng, PRODUCT_COLORS)).multiplyScalar(0.75 + rng() * 0.35));
+          goodsAt.push(new THREE.Matrix4().makeTranslation(cx - openW / 2 + 0.35 + (k / 10) * (openW - 0.6), 0.74 + s * 0.6, -shopDepth + 0.3));
+          goodsColor.push(new THREE.Color(pick(rng, PRODUCT_COLORS)).multiplyScalar(0.75 + rng() * 0.35));
         }
-        g.add(goods);
       }
     }
     if (shutter) {
@@ -147,9 +161,18 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
     g.add(sign);
   }
 
+  if (goodsAt.length) {
+    const goods = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.24, 0.14), GOODS_MAT, goodsAt.length);
+    goodsAt.forEach((m, k) => {
+      goods.setMatrixAt(k, m);
+      goods.setColorAt(k, goodsColor[k]!);
+    });
+    g.add(goods);
+  }
+
   // Corrugated canopy over the sidewalk, on thin steel posts.
   if (detailed) {
-    const canopyMat = pbrMaterial("rusty_corrugated_iron", { roughness: 1 });
+    const canopyMat = sharedMat("canopy", () => pbrMaterial("rusty_corrugated_iron", { roughness: 1 }));
     const canopy = new THREE.Mesh(boxWorldUV(w, 0.04, 1.9, 1.2), canopyMat);
     canopy.position.set(0, GROUND_H + 0.02, 0.95);
     canopy.rotation.x = 0.12;
@@ -177,9 +200,10 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
         bars.position.set(x, y, 0.07);
         g.add(bars);
         // AC unit or a curtain behind the glass
-        if (rng() < 0.18) addMesh(g, new THREE.BoxGeometry(0.8, 0.5, 0.35), new THREE.MeshStandardMaterial({ color: 0xe9e9e4, roughness: 0.5 }), x + 0.9, y - 0.4, 0.2);
+        if (rng() < 0.18) addMesh(g, new THREE.BoxGeometry(0.8, 0.5, 0.35), sharedMat("ac", () => new THREE.MeshStandardMaterial({ color: 0xe9e9e4, roughness: 0.5 })), x + 0.9, y - 0.4, 0.2);
         else if (rng() < 0.5) {
-          const cur = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(rng(), 0.4, 0.45), roughness: 0.9 });
+          const hue = Math.floor(rng() * 8) / 8;
+          const cur = sharedMat(`curtain|${hue}`, () => new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(hue, 0.4, 0.45), roughness: 0.9 }));
           addMesh(g, new THREE.PlaneGeometry(0.6, 1.15), cur, x - 0.3, y, 0.045, false);
         }
       }
@@ -197,7 +221,8 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
       // Laundry on the rail: wrappers and shirts drying in the sun.
       for (let k = 0; k < 4; k++) {
         if (rng() < 0.3) continue;
-        const cloth = new THREE.MeshStandardMaterial({ map: ankaraTexture(Math.floor(rng() * 10)), roughness: 0.95, side: THREE.DoubleSide });
+        const pattern = Math.floor(rng() * 10);
+        const cloth = sharedMat(`cloth|${pattern}`, () => new THREE.MeshStandardMaterial({ map: ankaraTexture(pattern), roughness: 0.95, side: THREE.DoubleSide }));
         addMesh(g, new THREE.PlaneGeometry(0.55, 0.7 + rng() * 0.3), cloth, bx - bw / 2 + 0.5 + k * (bw / 4), by + 0.7, 1.12, false);
       }
     }
@@ -219,7 +244,8 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
       }
     }
   } else {
-    const iron = pbrMaterial(rng() < 0.6 ? "rusty_corrugated_iron" : "corrugated_iron_02", { roughness: 1 });
+    const ironName = rng() < 0.6 ? "rusty_corrugated_iron" : "corrugated_iron_02";
+    const iron = sharedMat(`roof|${ironName}`, () => pbrMaterial(ironName, { roughness: 1 }));
     const rise = 1.5;
     const half = d / 2 + 0.35;
     const slope = Math.atan2(rise, half);
@@ -234,7 +260,7 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
       g.add(r);
     }
     // Gable ends
-    const gableMat = new THREE.MeshStandardMaterial({ color: spec.paint, roughness: 0.95, side: THREE.DoubleSide });
+    const gableMat = sharedMat(`gable|${spec.paint}`, () => new THREE.MeshStandardMaterial({ color: spec.paint, roughness: 0.95, side: THREE.DoubleSide }));
     const tri = new THREE.Shape();
     tri.moveTo(-d / 2, 0);
     tri.lineTo(d / 2, 0);
@@ -249,7 +275,7 @@ export async function building(spec: BuildingSpec, signOffset: number, detailed:
   }
 
   // Rain grime along the base of the facade.
-  const grimeMat = new THREE.MeshBasicMaterial({ map: grime(), transparent: true, depthWrite: false });
+  const grimeMat = sharedMat("grime", () => new THREE.MeshBasicMaterial({ map: grime(), transparent: true, depthWrite: false }));
   const gm = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.9), grimeMat);
   gm.position.set(0, 0.45, 0.07);
   g.add(gm);

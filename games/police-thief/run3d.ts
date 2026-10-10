@@ -22,7 +22,7 @@ const PRESET: Record<string, LightPreset> = { afternoon: "day", evening: "evenin
 const LEGS = ["L Thigh", "L Calf", "L Foot", "R Thigh", "R Calf", "R Foot"];
 const POOL: Record<ObstacleKind, number> = { brt: 2, hawker: 7, danfo: 7, keke: 7, okada: 3, barrier: 5, checkpoint: 2, table: 5, generator: 4, cart: 4, pole: 4, banner: 2, pothole: 7 };
 const VIEW_AHEAD = 190;
-const N_SEG = 7;
+const N_SEG = 6;
 
 interface ObView {
   obj: THREE.Object3D;
@@ -37,7 +37,7 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
   if (fog) {
     // The road leapfrogs ahead in 32 m slices; haze hides where it ends.
     fog.near = preset === "overcast" ? 14 : 30;
-    fog.far = preset === "overcast" ? 120 : 175;
+    fog.far = preset === "overcast" ? 120 : 155;
   }
   const overlay = createOverlay(ctx.canvas);
   const ambience = createAmbience(ctx.sfx);
@@ -81,13 +81,22 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
 
   async function init() {
     const quality = stage.quality;
-    const detailed = quality !== "low";
+    // Decorative scanned props are heavy (10-30k triangles each): desktop only.
+    const detailed = quality === "high";
     await preload({ avatars: ["tunde", "police", "woman1", "man1", "man2", "man3", "woman2", "emeka"], anims: ["run_m", "idle_m", "crouch_m", "sit_m", "walk_f", "talk_f", "talk_m", "phone_m", "idle_f", "look_m", "walk_m", "walk_f", "cheer_m"] }, (p) => (progress = p * 0.3));
     if (disposed) return;
     for (let i = 0; i < N_SEG; i++) {
-      const seg = await buildSegment(i, { detailed, people: quality === "high" ? 4 : quality === "medium" ? 2 : 0 });
+      // Animated people are the costliest thing on a phone: keep them few.
+      const crowd = quality === "high" ? { people: 2, walkers: 1, hawkers: 2 } : quality === "medium" ? { people: 1, walkers: 1, hawkers: 1 } : { people: 0, walkers: 0, hawkers: 1 };
+      const seg = await buildSegment(i, { detailed, ...crowd });
       if (disposed) return;
       seg.root.position.z = -i * SEG;
+      // Phones: the street itself doesn't cast shadows (the runner, police and traffic still do).
+      if (quality !== "high") {
+        seg.root.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh && !(o as THREE.SkinnedMesh).isSkinnedMesh) o.castShadow = false;
+        });
+      }
       stage.scene.add(seg.root);
       segments.push(seg);
       progress = 0.3 + (0.45 * (i + 1)) / N_SEG;
@@ -500,7 +509,12 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
     for (const v of views.values()) v.rider?.update(frameDt);
     for (const seg of segments) {
       const z = -seg.root.position.z;
-      if (z < s.dist + 70 && z + SEG > s.dist - 10) {
+      // People further than ~60 m are lost in the haze: don't draw or animate them.
+      const near = z < s.dist + 60 && z + SEG > s.dist - 10;
+      for (const c of seg.people) c.root.visible = near;
+      for (const c of seg.hawkers) c.root.visible = near;
+      for (const w of seg.walkers) w.c.root.visible = near;
+      if (near) {
         for (const p of seg.people) p.update(frameDt);
         for (const h of seg.hawkers) h.update(frameDt);
         for (const w of seg.walkers) {

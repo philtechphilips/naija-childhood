@@ -122,6 +122,8 @@ export function createStage(canvas: HTMLCanvasElement, opts: { quality?: Quality
   let pixelRatio = renderer.getPixelRatio();
   let shadowsHalved = false;
 
+  // Dev only: lets performance checks read draw calls / triangles per frame.
+  if (process.env.NODE_ENV !== "production") Object.assign(window, { __renderer: renderer, __scene: scene });
   return {
     renderer,
     scene,

@@ -5,6 +5,7 @@ import { addMesh, building } from "@/games/core3d/street";
 import { Character } from "@/games/core3d/character";
 import { MAT, billboard, boxWorldUV, cable, danfo, electricPole, headTray, keke, litter, planeWorldUV, produceHeap, stallTable, umbrella } from "@/games/core3d/procedural";
 import { OBSTACLES, laneX, type ObstacleKind } from "./run-rules";
+import { mergeStatic } from "@/games/core3d/merge";
 
 /**
  * The endless Lagos road for the street run: identical-length segments of
@@ -202,7 +203,7 @@ function footbridge() {
 }
 
 /** One 32 m slice of street. `index` seeds its look so neighbours differ. */
-export async function buildSegment(index: number, opts: { detailed: boolean; people: number }): Promise<Segment> {
+export async function buildSegment(index: number, opts: { detailed: boolean; people: number; walkers: number; hawkers: number }): Promise<Segment> {
   mats ??= makeMats();
   const M = mats;
   const rng = createRng(1000 + index * 37);
@@ -350,6 +351,9 @@ export async function buildSegment(index: number, opts: { detailed: boolean; peo
     root.add(b);
   }
 
+  // Everything so far is static: merge it into a few big meshes (hundreds of draw calls -> dozens).
+  mergeStatic(root);
+
   // A few people standing outside the shops: chatting, on the phone, a hawker.
   const people: Character[] = [];
   const who: [string, string][] = [
@@ -384,7 +388,7 @@ export async function buildSegment(index: number, opts: { detailed: boolean; peo
     ["woman1", "walk_f"],
   ];
   await Promise.all(
-    Array.from({ length: Math.ceil(opts.people / 2) }, async (_, k) => {
+    Array.from({ length: opts.walkers }, async (_, k) => {
       const [id, clip] = strollers[(index + k) % strollers.length]!;
       const c = await Character.create(id, [clip]);
       const side = (index + k) % 2 ? -1 : 1;
@@ -406,7 +410,7 @@ export async function buildSegment(index: number, opts: { detailed: boolean; peo
     ["man1", "talk_m"],
   ];
   await Promise.all(
-    Array.from({ length: opts.people > 0 ? 2 : 0 }, async (_, k) => {
+    Array.from({ length: opts.hawkers }, async (_, k) => {
       const [id, clip] = sellers[(index + k) % sellers.length]!;
       const c = await Character.create(id, [clip]);
       const side = (index + k) % 2 ? 1 : -1;
@@ -690,6 +694,8 @@ export async function buildObstacle(kind: ObstacleKind, seed: number): Promise<T
       o.receiveShadow = true;
     }
   });
+  // Static model: one mesh per material instead of dozens of parts.
+  mergeStatic(g);
   return g;
 }
 
