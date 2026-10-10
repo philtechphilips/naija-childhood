@@ -11,11 +11,15 @@ import { createBoardDecal, toWorld } from "@/games/suwe/board3d";
 import { CLASSIC, makeBoard } from "@/games/suwe/rules";
 import { buildPlace } from "@/games/core3d/places";
 import { buildYard } from "@/games/hide-seek/yard3d";
+import { measureArms, reach } from "@/games/hand-slap/arms";
 
 const X = new THREE.Vector3(1, 0, 0);
 const Z = new THREE.Vector3(0, 0, 1);
 
-type Ctx = { scene: THREE.Scene; camera: THREE.PerspectiveCamera; focus: (v: THREE.Vector3) => void };
+type Ctx = { scene: THREE.Scene; camera: THREE.PerspectiveCamera; focus: (v: THREE.Vector3) => void; spot: THREE.Vector3 };
+
+/** Shots set somewhere other than the market street. */
+const PLACE: Record<string, "compound" | "school"> = { "hide-seek": "compound", "hand-slap": "school" };
 
 async function person(scene: THREE.Scene, id: string, clip: string, x: number, z: number, rotY: number, offset: number) {
   const c = await Character.create(id, [clip]);
@@ -153,6 +157,35 @@ const SHOTS: Record<string, (c: Ctx) => Promise<void>> = {
     camera.fov = 46;
     focus(new THREE.Vector3(-1.5, 0, -5));
   },
+  /** Backhand slap: Emeka's hands whip down as Ada yanks hers away. */
+  async "hand-slap"({ scene, camera, focus, spot }) {
+    const ada = await person(scene, "ada", "idle_f", spot.x + 0.42, spot.z, -Math.PI / 2, 0.3);
+    const emeka = await person(scene, "emeka", "idle_m", spot.x - 0.42, spot.z, Math.PI / 2, 0.6);
+    const y = (ada.bone("L UpperArm")?.getWorldPosition(new THREE.Vector3()).y ?? 1.1) - 0.3;
+    for (const [c, fwd, attacking] of [
+      [emeka, 1, true],
+      [ada, -1, false],
+    ] as const) {
+      const rig = measureArms(c);
+      for (const side of ["L", "R"] as const) {
+        const sh = c.bone(`${side} UpperArm`)!.getWorldPosition(new THREE.Vector3());
+        const lateral = new THREE.Vector3(0, 0, sh.z - spot.z);
+        const target = attacking
+          ? new THREE.Vector3(spot.x - 0.02, y + 0.14, spot.z + lateral.z * 0.75)
+          : sh.clone().add(new THREE.Vector3(fwd * 0.14, -0.3, -lateral.z * 0.3));
+        const thumb = attacking ? new THREE.Vector3(0, 0.3, -Math.sign(lateral.z)) : new THREE.Vector3(0, 0, -Math.sign(lateral.z));
+        reach(c, rig, side, target, new THREE.Vector3(0, -1, Math.sign(lateral.z) * 0.6), thumb);
+      }
+    }
+    ada.rotateWorld("Spine1", new THREE.Vector3(0, 0, 1), -0.12);
+    await person(scene, "tunde", "cheer_m", spot.x - 0.3, spot.z + 2.2, Math.PI, 0.35);
+    await person(scene, "aisha", "clap_f", spot.x + 1.1, spot.z + 1.7, Math.PI - 0.5, 0.6);
+    await person(scene, "tunde", "clap_m", spot.x - 1.8, spot.z + 1.6, Math.PI + 0.6, 0.15);
+    camera.position.set(spot.x + 0.15, y + 0.42, spot.z - 1.8);
+    camera.lookAt(spot.x, y + 0.2, spot.z);
+    camera.fov = 48;
+    focus(spot);
+  },
   async playground({ scene, camera, focus }) {
     await person(scene, "ada", "cheer_f", 16.0, 31.3, Math.PI + 0.25, 0.4);
     await person(scene, "aisha", "clap_f", 16.8, 31.4, Math.PI - 0.2, 0.55);
@@ -176,10 +209,13 @@ export function KeyArt() {
     let raf = 0;
     let alive = true;
     (async () => {
-      const inCompound = shot === "hide-seek";
-      if (inCompound) {
-        await buildPlace(stage.scene, "compound", { detailed: true, walkers: 0, traffic: 0, rollers: false, props: false });
-        await buildYard(stage.scene);
+      const placeId = PLACE[shot];
+      const inCompound = placeId !== undefined;
+      let spot = new THREE.Vector3();
+      if (placeId) {
+        const place = await buildPlace(stage.scene, placeId, { detailed: true, walkers: 0, traffic: 0, rollers: false, props: placeId !== "compound" });
+        spot = place.spot.clone();
+        if (placeId === "compound") await buildYard(stage.scene);
       } else await buildStreet(stage.scene, { detailed: true, jail: shot === "police-thief" });
       const crowd = await createCrowd(stage.scene, { walkers: inCompound ? 0 : 30, seed: 5, traffic: inCompound ? 0 : 8, rollers: !inCompound });
       crowd.update(0.001, new THREE.Vector3());
@@ -187,6 +223,7 @@ export function KeyArt() {
       await SHOTS[shot]!({
         scene: stage.scene,
         camera: stage.camera,
+        spot,
         focus: (v) => {
           subject = v.clone();
           stage.focusShadows(v);

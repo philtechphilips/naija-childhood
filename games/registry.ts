@@ -266,6 +266,49 @@ export const GAMES: GameDefinition[] = [
     ],
     load: () => import("./hide-seek").then((m) => m.default),
   },
+  {
+    slug: "hand-slap",
+    name: "Backhand Slap",
+    tagline: "3, 2, 1… pull your hand!",
+    description:
+      "Palms up under his hands, or his hands on top of yours. After the count, slap the back of Emeka's hands before he pulls away. When it's his turn, pull away fast, but if you flinch at a fake, he gets a free slap. First to five red hands loses.",
+    photo: "hand-slap",
+    accent: "#ff7a59",
+    difficulty: "Easy",
+    players: "1 player",
+    sessionLength: "1–2 min",
+    howTo: [
+      { title: "3, 2, 1… GO!", body: "Every turn starts with a count. Nobody moves till GO." },
+      { title: "Your turn: slap", body: "Press SLAP to whip your hands onto the back of his. Too slow and he pulls away, then it's his turn. Don't wait too long either." },
+      { title: "Fake him out", body: "Press FAKE to twitch. If Emeka flinches, you get a free slap." },
+      { title: "His turn: pull away", body: "Watch his hands dip, then press PULL AWAY. Pull at a fake (or before GO) and he gets a free slap. Pull in time and it's your turn." },
+    ],
+    controlsHelp: "Tap SLAP / PULL (Space), FAKE (F).",
+    modes: [{ id: "cpu", label: "Vs Emeka", description: "First to five slaps wins.", available: true }],
+    options: [
+      {
+        id: "difficulty",
+        label: "Difficulty",
+        choices: [
+          { value: "easy", label: "Easy" },
+          { value: "normal", label: "Normal" },
+          { value: "hard", label: "Hard" },
+        ],
+        defaultValue: "normal",
+      },
+      {
+        id: "place",
+        label: "Place",
+        choices: [
+          { value: "school", label: "School yard" },
+          { value: "compound", label: "Compound" },
+          { value: "street", label: "Street" },
+        ],
+        defaultValue: "school",
+      },
+    ],
+    load: () => import("./hand-slap").then((m) => m.default),
+  },
 ];
 
 export const ROADMAP = ["Ayo Olopon", "Tin game", "Dodgeball", "Egg & spoon", "Freeze", "Tinko tinko", "Ludo"];

@@ -11,12 +11,15 @@ interface AiProfile {
   /** Probability of a perfect throw when it doesn't foul. */
   perfect: number;
   startBpm: number;
+  /** bpm added after each throw, and the fastest it gets. */
+  rampBpm: number;
+  topBpm: number;
 }
 
 export const AI_PROFILES: Record<Difficulty, AiProfile> = {
-  easy: { read: 0.12, foul: 0.1, perfect: 0.3, startBpm: 96 },
-  normal: { read: 0.5, foul: 0.04, perfect: 0.55, startBpm: 112 },
-  hard: { read: 0.78, foul: 0.015, perfect: 0.8, startBpm: 126 },
+  easy: { read: 0.12, foul: 0.1, perfect: 0.3, startBpm: 84, rampBpm: 1.5, topBpm: 112 },
+  normal: { read: 0.5, foul: 0.04, perfect: 0.55, startBpm: 96, rampBpm: 2, topBpm: 132 },
+  hard: { read: 0.78, foul: 0.015, perfect: 0.8, startBpm: 112, rampBpm: 2.5, topBpm: 160 },
 };
 
 /**

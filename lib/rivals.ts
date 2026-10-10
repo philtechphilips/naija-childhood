@@ -47,4 +47,11 @@ export const RIVALS: Record<GameSlug, { name: string; score: number }[]> = {
     { name: "Giggly Gbemi", score: 900 },
     { name: "Always-Found Femi", score: 450 },
   ],
+  "hand-slap": [
+    { name: "Iron Palms Ikenna", score: 1300 },
+    { name: "Quick-Draw Kemi", score: 1120 },
+    { name: "Feint King Fola", score: 940 },
+    { name: "Red Hands Rotimi", score: 600 },
+    { name: "Flinchy Fatima", score: 250 },
+  ],
 };

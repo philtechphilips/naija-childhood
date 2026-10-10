@@ -68,7 +68,7 @@ export function createTenTenMatch(opts: MatchOptions) {
   const cpuRng = createRng(opts.seed ^ 0x9e3779b9);
   const oppName = local ? "Player 2" : opts.opponent ?? pick(rng, OPPONENTS);
   const names: [string, string] = [local ? "Player 1" : opts.playerName || "You", oppName];
-  const startBpm = AI_PROFILES[difficulty].startBpm;
+  const { startBpm, rampBpm, topBpm } = AI_PROFILES[difficulty];
   const predictor = new SidePredictor();
 
   const s = {
@@ -139,7 +139,7 @@ export function createTenTenMatch(opts: MatchOptions) {
     if (w !== null) s.points[w]++;
     const prev = s.leader;
     s.leader = nextLeader(s.leader, w);
-    s.beat = 60 / bpmFor(startBpm, throws.length);
+    s.beat = 60 / bpmFor(startBpm, throws.length, rampBpm, topBpm);
     const over = s.points[0] >= target || s.points[1] >= target;
     const events: TenTenEvent[] = [
       { type: "resolve", winner: w, judgements: [j0, j1], sides, offsets: [p.offsets[0], local ? p.offsets[1] : p.cpu?.offset ?? null], switched: s.leader !== prev && !over },

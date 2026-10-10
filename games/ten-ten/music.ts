@@ -314,5 +314,5 @@ export function createMusicSync(music: TenTenMusic, m: { state: { phase: string;
   };
 }
 
-/** 0 at a relaxed 100 bpm, 1 at the 172 bpm top speed. */
-const intensity = (beat: number) => Math.max(0, Math.min(1, (60 / beat - 100) / 72));
+/** 0 at a relaxed 84 bpm, 1 at the 160 bpm top speed (Hard). */
+const intensity = (beat: number) => Math.max(0, Math.min(1, (60 / beat - 84) / 76));
