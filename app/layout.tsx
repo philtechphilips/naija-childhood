@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Bricolage_Grotesque, Inter, Lilita_One } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
 import "./globals.css";
@@ -64,6 +65,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-NG" className={`${game.variable} ${hud.variable} ${body.variable}`}>
       <body>
         <AppShell>{children}</AppShell>
+        {/* Sabilytics page analytics, live site only (local dev visits aren't counted). */}
+        {process.env.NODE_ENV === "production" && (
+          <Script async src="https://www.sabilytics.com/script.js" data-site="c5ak5z5f4gp9" data-domain="naija-childhood.pelumiisola.tech" strategy="afterInteractive" />
+        )}
       </body>
     </html>
   );
