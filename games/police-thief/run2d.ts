@@ -3,7 +3,7 @@ import { createLoop } from "@/games/core/loop";
 import { context2d, fitCanvas, fonts } from "@/games/core/canvas";
 import { clamp, hudText, roundRect } from "@/games/core/draw";
 import { LOOKS, drawKid, neutralPose, type KidLook } from "@/games/core/kid";
-import { OBSTACLES, RUN, SNACKS, laneX, type Obstacle } from "./run-rules";
+import { OBSTACLES, RUN, SNACKS, laneX, type Obstacle, type ObstacleSpec } from "./run-rules";
 import { createRun, type RunEvent } from "./run-sim";
 import { createNaijaMusic } from "@/games/core/naija-music";
 import { KIND_NAMES, bindRunKeys, runResult } from "./run-shared";
@@ -44,6 +44,16 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
       else if (e.type === "snack") {
         ctx.sfx.play("rescue", 0.6);
         popup(SNACKS[e.kind].rush ? "ENERGY RUSH!" : "SNATCHED!", SNACKS[e.kind].rush ? "#7ec8ff" : "#ffd166", 34);
+      } else if (e.type === "turbo") {
+        ctx.sfx.play("rescue", 0.8);
+        ctx.sfx.play("go", 0.6);
+        ctx.haptic([30, 20, 60]);
+        popup("AGBO TURBO!", "#7cff8a", 38);
+      } else if (e.type === "smash") {
+        ctx.sfx.play("miss", 0.7);
+        ctx.haptic(30);
+        shake = Math.max(shake, 0.35);
+        popup("No wahala!", "#7cff8a", 26);
       } else if (e.type === "tired") popup("Thief dey tire! Snatch food!", "#ff8a6b", 20);
       else if (e.type === "stumble") {
         ctx.sfx.play("whistle", 0.9);
@@ -63,7 +73,7 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
 
   function update(dt: number) {
     handle(run.update(dt));
-    music.setIntensity(Math.max(s.chase, (s.speed - 10) / 11, s.rush > 0 ? 1 : 0));
+    music.setIntensity(Math.max(s.chase, (s.speed - 10) / 11, s.rush > 0 || s.turbo > 0 ? 1 : 0));
     for (const p of popups) p.age += dt;
     for (let i = popups.length - 1; i >= 0; i--) if (popups[i]!.age > 1.4) popups.splice(i, 1);
     shake = Math.max(0, shake - dt * 1.6);
@@ -203,6 +213,30 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
         },
       });
     }
+    for (const b of run.track.boosts) {
+      if (b.z > s.dist + 140) break;
+      if (b.taken || b.z < camZ + 1) continue;
+      items.push({
+        z: b.z,
+        draw: () => {
+          // Agbo bottle with a green glow.
+          const p = proj(laneX(b.lane), 1.1 + Math.sin(performance.now() / 300 + b.id) * 0.1, b.z);
+          const glow = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.k * 0.6);
+          glow.addColorStop(0, "rgba(120,255,140,0.7)");
+          glow.addColorStop(1, "rgba(120,255,140,0)");
+          g.fillStyle = glow;
+          g.fillRect(p.x - p.k * 0.6, p.y - p.k * 0.6, p.k * 1.2, p.k * 1.2);
+          const w = p.k * 0.26;
+          const h = p.k * 0.42;
+          g.fillStyle = "#1f7a2e";
+          roundRect(g, p.x - w / 2, p.y - h / 2, w, h, w / 3);
+          g.fill();
+          g.fillRect(p.x - w * 0.18, p.y - h * 0.75, w * 0.36, h * 0.3);
+          g.fillStyle = "#f4e3b0";
+          g.fillRect(p.x - w / 2, p.y - h * 0.1, w, h * 0.28);
+        },
+      });
+    }
     items.push({ z: s.dist, draw: drawRunner });
     if (s.chase > 0.05 || s.phase !== "run") {
       const gap = s.phase === "caught" || s.phase === "over" ? 0.9 : 15 - 13.2 * Math.pow(s.chase, 0.7);
@@ -213,7 +247,17 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
 
     function drawObstacle(o: Obstacle) {
       const spec = OBSTACLES[o.kind];
-      const x = spec.wide ? 0 : (o.x ?? laneX(o.lane));
+      // Knocked aside by a thief on agbo turbo: it flies off and fades out.
+      const knockT = o.knocked === undefined ? 0 : s.clock - o.knocked;
+      if (knockT > 0.5) return;
+      g.globalAlpha = 1 - knockT * 2;
+      drawObstacleBody(o, spec, knockT);
+      g.globalAlpha = 1;
+    }
+
+    function drawObstacleBody(o: Obstacle, spec: ObstacleSpec, knockT: number) {
+      const lift = knockT * 3;
+      const x = spec.wide ? 0 : (o.x ?? laneX(o.lane)) + (o.lane === 0 ? -1 : 1) * knockT * 4;
       const hw = spec.wide ? 3.6 : spec.halfW;
       const front = proj(x - hw, 0, Math.max(o.z, camZ + 0.5));
       const frontR = proj(x + hw, 0, Math.max(o.z, camZ + 0.5));
@@ -225,8 +269,8 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
         g.fill();
         return;
       }
-      const yBottom = spec.clear === "slide" ? spec.h : 0;
-      const yTop = spec.clear === "slide" ? spec.h + 0.8 : spec.h;
+      const yBottom = (spec.clear === "slide" ? spec.h : 0) + lift;
+      const yTop = (spec.clear === "slide" ? spec.h + 0.8 : spec.h) + lift;
       const tl = proj(x - hw, yTop, o.z);
       const br = proj(x + hw, yBottom, o.z);
       if (o.kind === "hawker") {
@@ -267,7 +311,18 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
     }
 
     function drawRunner() {
-      drawPerson(s.x, s.dist, THIEF_LOOK, s.y, s.slide > 0 && s.grounded ? 1 : 0);
+      if (s.turbo > 0 && s.phase === "run") {
+        // Gold glow round the thief while the agbo lasts.
+        const p = proj(s.x, s.y + 0.8, s.dist);
+        const glow = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.k * 1.2);
+        glow.addColorStop(0, `rgba(255,215,90,${0.55 * Math.min(1, s.turbo / 0.6)})`);
+        glow.addColorStop(1, "rgba(255,215,90,0)");
+        g.fillStyle = glow;
+        g.fillRect(p.x - p.k * 1.2, p.y - p.k * 1.2, p.k * 2.4, p.k * 2.4);
+      }
+      // Turbo crash: squashes down for a moment, then straight back up.
+      const knock = s.knock > 0 ? Math.sin((1 - s.knock / RUN.knockSeconds) * Math.PI) * 0.6 : 0;
+      drawPerson(s.x, s.dist, THIEF_LOOK, s.y, Math.max(s.slide > 0 && s.grounded ? 1 : 0, knock));
     }
 
     g.setTransform(vp.dpr, 0, 0, vp.dpr, 0, 0);
@@ -297,8 +352,13 @@ export function createPoliceRun2D(ctx: EngineContext): GameEngine {
     g.fillStyle = "rgba(10,14,12,0.72)";
     g.fill();
     roundRect(g, 22, 74, (ew - 20) * s.energy + 2, 8, 4);
-    g.fillStyle = s.rush > 0 ? "#7ec8ff" : s.energy < RUN.tired ? "#ff5d5d" : "#7ee08a";
+    g.fillStyle = s.turbo > 0 ? "#7cff8a" : s.rush > 0 ? "#7ec8ff" : s.energy < RUN.tired ? "#ff5d5d" : "#7ee08a";
     g.fill();
+    if (s.turbo > 0) {
+      roundRect(g, 22, 86, (ew - 20) * (s.turbo / RUN.turboSeconds), 3, 1.5);
+      g.fillStyle = "#ffd54f";
+      g.fill();
+    }
     if (s.phase === "intro" || (s.phase === "run" && s.runTime < 4.5)) {
       hudText(g, "Swipe ← → to dodge · ↑ jump · ↓ slide", W / 2, H - 50, { size: 14, font: font.body, weight: 700, color: "#fff", stroke: "rgba(0,0,0,0.6)", strokeWidth: 4 });
     }

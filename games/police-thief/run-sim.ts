@@ -7,6 +7,9 @@ export type RunEvent =
   | { type: "snack"; kind: SnackKind; lane: number; z: number }
   | { type: "tired" }
   | { type: "rushEnd" }
+  | { type: "turbo"; lane: number; z: number }
+  | { type: "turboEnd" }
+  | { type: "smash"; kind: ObstacleKind }
   | { type: "jump" }
   | { type: "land" }
   | { type: "slide" }
@@ -51,6 +54,10 @@ export interface RunState {
   /** Seconds of energy-drink rush left (faster, can't be tripped). */
   rush: number;
   snacks: number;
+  /** Seconds of agbo turbo left (much faster; crashes only make you stagger). */
+  turbo: number;
+  /** Seconds left of the stagger after crashing through something on turbo. */
+  knock: number;
 }
 
 const ACTIVATE = 75;
@@ -84,6 +91,8 @@ export function createRun(seed: number) {
     energy: 1,
     rush: 0,
     snacks: 0,
+    turbo: 0,
+    knock: 0,
   };
   let wasTired = false;
   const queue: RunAction[] = [];
@@ -173,6 +182,13 @@ export function createRun(seed: number) {
       if (o.hit || o.z + spec.len < far) continue;
       if (!lateral(o, s.x) || !vertical(o)) continue;
       o.hit = true;
+      // Agbo turbo: knock it aside, stagger, get straight back up and keep running.
+      if (s.turbo > 0) {
+        if (spec.clear !== "hole") o.knocked = s.clock;
+        s.knock = RUN.knockSeconds;
+        ev.push({ type: "smash", kind: o.kind });
+        continue;
+      }
       if (spec.clear === "hole") {
         ev.push({ type: "splash" });
         stumble(o, false, ev);
@@ -236,15 +252,25 @@ export function createRun(seed: number) {
           s.rush = Math.max(0, s.rush - dt);
           if (s.rush === 0) ev.push({ type: "rushEnd" });
         }
+        if (s.turbo > 0) {
+          s.turbo = Math.max(0, s.turbo - dt);
+          if (s.turbo === 0) ev.push({ type: "turboEnd" });
+        }
+        s.knock = Math.max(0, s.knock - dt);
         const tired = s.energy < RUN.tired;
         if (tired && !wasTired) ev.push({ type: "tired" });
         wasTired = tired;
         // Tired legs: slower, and the police creep up on you. A rush pushes them back.
         const legs = tired ? 0.82 + 0.18 * (s.energy / RUN.tired) : 1;
         const base = Math.min(RUN.maxSpeed, RUN.startSpeed + RUN.accel * s.runTime);
-        s.speed = base * s.slow * legs * (s.rush > 0 ? RUN.rushBoost : 1);
+        // Turbo kicks in fast and eases off at the end; a stagger costs a moment's speed.
+        const turbo = s.turbo > 0 ? 1 + (RUN.turboBoost - 1) * Math.min(1, (RUN.turboSeconds - s.turbo) / 0.25, s.turbo / 0.6) : 0;
+        const boost = Math.max(turbo, s.rush > 0 ? RUN.rushBoost : 1);
+        const stagger = 1 - 0.3 * (s.knock / RUN.knockSeconds);
+        s.speed = base * s.slow * legs * boost * stagger;
         s.dist += s.speed * dt;
-        if (s.rush > 0) s.chase = Math.max(0, s.chase - dt * 0.8);
+        if (s.turbo > 0) s.chase = Math.max(0, s.chase - dt * 1.5);
+        else if (s.rush > 0) s.chase = Math.max(0, s.chase - dt * 0.8);
         else if (tired) s.chase = Math.min(1, s.chase + dt * (0.08 + (RUN.tired - s.energy) * 0.9));
         else s.chase = Math.max(0, s.chase - dt / RUN.heat);
         s.sinceStumble += dt;
@@ -307,6 +333,18 @@ export function createRun(seed: number) {
             s.energy = Math.min(1, s.energy + snack.energy);
             if (snack.rush) s.rush = RUN.rushSeconds;
             ev.push({ type: "snack", kind: k.kind, lane: k.lane, z: k.z });
+          }
+        }
+        for (const b of track.boosts) {
+          if (b.z > s.dist + 1) break;
+          if (b.taken || b.z < s.dist - 1.2) continue;
+          if (Math.abs(laneX(b.lane) - s.x) < 0.9 && s.y < 2.2) {
+            b.taken = true;
+            s.turbo = RUN.turboSeconds;
+            // Agbo sorts out tired legs too.
+            s.energy = Math.min(1, s.energy + 0.25);
+            s.slow = 1;
+            ev.push({ type: "turbo", lane: b.lane, z: b.z });
           }
         }
         // A heads-up so the renderer can honk/rev as traffic gets close.

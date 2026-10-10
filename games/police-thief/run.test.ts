@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OBSTACLES, createTrack, encodeRun, laneX, scoreRun, validateRun } from "./run-rules";
+import { OBSTACLES, RUN, createTrack, encodeRun, laneX, scoreRun, validateRun } from "./run-rules";
 import { createRun, type Run } from "./run-sim";
 
 /** A look-ahead bot: changes lane around vehicles, jumps low stuff, slides under poles. */
@@ -77,6 +77,36 @@ describe("street run", () => {
     });
     expect(s.stumbles).toBe(1);
     expect(s.phase).toBe("caught");
+  });
+
+  it("agbo turbo: faster, and crashes don't stop you", () => {
+    const run = createRun(5);
+    for (let i = 0; i < 120; i++) run.update(1 / 60);
+    const s = run.state;
+    const before = s.speed;
+    run.track.boosts.unshift({ id: 800, lane: s.lane, z: s.dist + 0.2 });
+    for (let i = 0; i < 30; i++) run.update(1 / 60);
+    expect(s.turbo).toBeGreaterThan(0);
+    expect(s.speed).toBeGreaterThan(before * 1.5);
+    // Straight into a danfo and a barrier: knocked aside, still running.
+    s.chase = 1;
+    for (const kind of ["danfo", "barrier"] as const) {
+      const o = { id: 900, kind, lane: s.lane, z: s.dist + 0.1, speed: 0, seed: 0 };
+      run.track.obstacles.unshift(o);
+      run.update(1 / 60);
+      expect(o).toHaveProperty("knocked");
+    }
+    expect(s.phase).toBe("run");
+    expect(s.stumbles).toBe(0);
+    for (let i = 0; i < 60 * 7; i++) run.update(1 / 60);
+    expect(s.turbo).toBe(0);
+  });
+
+  it("puts agbo bottles on the street, well spaced", () => {
+    const t = createTrack(11);
+    t.fill(4000);
+    expect(t.boosts.length).toBeGreaterThan(4);
+    for (let i = 1; i < t.boosts.length; i++) expect(t.boosts[i]!.z - t.boosts[i - 1]!.z).toBeGreaterThanOrEqual(RUN.turboGap);
   });
 
   it("validates honest runs and rejects tampered ones", () => {

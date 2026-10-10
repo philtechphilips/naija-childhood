@@ -817,7 +817,37 @@ export function snackModel(kind: "roll" | "energy"): THREE.Group {
   return g;
 }
 
-function glowSprite(color: string) {
+/** Agbo bottle: dark green glass, cork, herbs inside, glowing so it reads from down the road. */
+export function agboModel(): THREE.Group {
+  const g = new THREE.Group();
+  const item = new THREE.Group();
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1f7a2e, roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.85, emissive: 0x0b3d12 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.13, 0.36, 20), glass);
+  const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), glass);
+  shoulder.position.y = 0.18;
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.14, 14), glass);
+  neck.position.y = 0.33;
+  const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.07, 12), new THREE.MeshStandardMaterial({ color: 0x9a6b3a, roughness: 0.9 }));
+  cork.position.y = 0.43;
+  // Bark and leaves steeping inside.
+  const herbs = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.11, 0.22, 14), new THREE.MeshStandardMaterial({ color: 0x5a3a12, roughness: 0.8 }));
+  herbs.position.y = -0.06;
+  const label = new THREE.Mesh(new THREE.CylinderGeometry(0.131, 0.131, 0.15, 20, 1, true), wrapperMat("#f4e3b0", "#c0392b", "AGBO ⚡", "#1f4d1a"));
+  label.position.y = 0.02;
+  item.add(herbs, body, shoulder, neck, cork, label);
+  item.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) o.castShadow = true;
+  });
+  item.name = "item";
+  g.add(item);
+  const glow = glowSprite("rgba(120,255,140,0.95)");
+  glow.scale.setScalar(1.3);
+  glow.position.y = 0.1;
+  g.add(glow);
+  return g;
+}
+
+export function glowSprite(color: string) {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const x = c.getContext("2d")!;

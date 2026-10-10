@@ -11,7 +11,7 @@ import { createRain } from "@/games/core3d/rain";
 import { OBSTACLES, RUN, SNACKS, laneX, type Obstacle, type ObstacleKind, type SnackKind } from "./run-rules";
 import { createRun, type RunEvent } from "./run-sim";
 import { createNaijaMusic } from "@/games/core/naija-music";
-import { HAWKER_CALLS, SEG, buildObstacle, buildSegment, hawkerPerson, hawkerStand, kondo, okadaRider, type HawkerStand, type Segment } from "./run-world";
+import { HAWKER_CALLS, SEG, agboModel, buildObstacle, glowSprite, buildSegment, hawkerPerson, hawkerStand, kondo, okadaRider, type HawkerStand, type Segment } from "./run-world";
 import { bindRunKeys, runResult, KIND_NAMES } from "./run-shared";
 import { SHOUT_TEXT, createStreetVoices, type Shout } from "./run-voices";
 
@@ -22,6 +22,8 @@ const PRESET: Record<string, LightPreset> = { afternoon: "day", evening: "evenin
 const LEGS = ["L Thigh", "L Calf", "L Foot", "R Thigh", "R Calf", "R Foot"];
 const POOL: Record<ObstacleKind, number> = { brt: 2, hawker: 7, danfo: 7, keke: 7, okada: 3, barrier: 5, checkpoint: 2, table: 5, generator: 4, cart: 4, pole: 4, banner: 2, pothole: 7 };
 const VIEW_AHEAD = 190;
+/** What the thief shouts as he bounces off something on agbo turbo. */
+const SMASH_LINES = ["No wahala!", "I dey kampe!", "E no reach me!", "Agbo dey work!"];
 const N_SEG = 6;
 
 interface ObView {
@@ -71,6 +73,10 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
   /** Hawkers holding out sausage rolls / energy drinks for the thief to snatch. */
   const standPool: Record<SnackKind, HawkerStand[]> = { roll: [], energy: [] };
   const standViews = new Map<number, HawkerStand>();
+  /** Agbo bottles floating over the road, and the gold glow round the thief on turbo. */
+  const agboPool: THREE.Group[] = [];
+  const agboViews = new Map<number, THREE.Group>();
+  let aura: THREE.Sprite | null = null;
   const popups: { text: string; color: string; age: number; size: number }[] = [];
   const sparks: { pos: THREE.Vector3; age: number }[] = [];
   let shake = 0;
@@ -132,6 +138,17 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
         standPool[kind].push(stand);
       }
     }
+    for (let i = 0; i < 2; i++) {
+      const b = agboModel();
+      b.scale.setScalar(1.6);
+      b.visible = false;
+      stage.scene.add(b);
+      agboPool.push(b);
+    }
+    aura = glowSprite("rgba(255,215,90,0.85)");
+    aura.scale.set(1.8, 2.6, 1);
+    aura.visible = false;
+    stage.scene.add(aura);
     progress = 0.9;
 
     // Naira coins: one instanced mesh, gold with a ₦ on each face.
@@ -223,6 +240,25 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
           shoutFrom("catcham");
           break;
         case "rushEnd":
+          break;
+        case "turbo":
+          ctx.sfx.play("rescue", 0.8);
+          ctx.sfx.play("go", 0.6);
+          ctx.haptic([30, 20, 60]);
+          shake = 0.3;
+          popup("AGBO TURBO!", "#7cff8a", 46);
+          popup("Nothing fit stop you now!", "#fff", 20);
+          shoutFrom("catcham");
+          break;
+        case "turboEnd":
+          popup("Agbo don wear off", "rgba(255,255,255,0.8)", 20);
+          break;
+        case "smash":
+          ctx.sfx.play("miss", 0.7);
+          if (OBSTACLES[e.kind].clear === "block") ctx.sfx.play("horn", 0.5);
+          ctx.haptic(30);
+          shake = Math.max(shake, 0.35);
+          popup(SMASH_LINES[Math.floor(Math.random() * SMASH_LINES.length)]!, "#7cff8a", 30);
           break;
         case "jump":
           ctx.sfx.play("tick", 0.5);
@@ -328,8 +364,25 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
     const spec = OBSTACLES[o.kind];
     v.obj.position.set(spec.wide ? 0 : (o.x ?? laneX(o.lane)), 0, -(o.z + spec.len / 2));
     // Traffic driving ahead of you shows its back; hawkers face where they're walking.
-    if (o.vx) v.obj.rotation.y = o.vx > 0 ? Math.PI / 2 : -Math.PI / 2;
-    else v.obj.rotation.y = o.speed < 0 ? Math.PI : 0;
+    v.obj.rotation.set(0, o.vx ? (o.vx > 0 ? Math.PI / 2 : -Math.PI / 2) : o.speed < 0 ? Math.PI : 0, 0);
+    if (o.knocked === undefined) return;
+    // Knocked aside by a thief on agbo turbo: out towards the kerb.
+    const t = s.clock - o.knocked;
+    const dir = spec.wide ? 0 : o.lane === 0 ? -1 : o.lane === 2 ? 1 : o.seed % 2 ? 1 : -1;
+    if (spec.clear === "block" || o.kind === "hawker") {
+      // Vehicles and people get shoved over with a lurch.
+      const k = 1 - Math.pow(1 - Math.min(1, t / 0.5), 3);
+      v.obj.position.x += (dir || 1) * 1.3 * k;
+      v.obj.rotation.z += (dir || 1) * 0.2 * Math.sin(Math.min(1, t / 0.6) * Math.PI);
+    } else {
+      // Tables, barriers, generators: sent flying, tumbling, then they land.
+      const tt = Math.min(t, 0.65);
+      v.obj.position.x += dir * tt * 5;
+      v.obj.position.y = Math.max(0, 6.5 * t - 10 * t * t);
+      v.obj.position.z -= tt * 6;
+      v.obj.rotation.x += tt * 7;
+      v.obj.rotation.z += dir * tt * 4;
+    }
   }
 
   const m4 = new THREE.Matrix4();
@@ -383,6 +436,31 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
     }
   }
 
+  function syncBoosts(t: number) {
+    const live = new Set<number>();
+    for (const b of run.track.boosts) {
+      if (b.z > s.dist + 140) break;
+      if (b.taken || b.z < s.dist - 4) continue;
+      let v = agboViews.get(b.id);
+      if (!v) {
+        v = agboPool.pop();
+        if (!v) continue;
+        agboViews.set(b.id, v);
+        v.visible = true;
+      }
+      live.add(b.id);
+      v.position.set(laneX(b.lane), 1.05 + Math.sin(t * 3 + b.id) * 0.12, -b.z);
+      const item = v.getObjectByName("item");
+      if (item) item.rotation.set(0.25, t * 2.5, 0);
+    }
+    for (const [id, v] of agboViews) {
+      if (live.has(id)) continue;
+      v.visible = false;
+      agboViews.delete(id);
+      agboPool.push(v);
+    }
+  }
+
   function recycleSegments() {
     for (const seg of segments) {
       const near = -seg.root.position.z; // track metre where this slice starts
@@ -393,7 +471,7 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
   function update(dt: number) {
     if (!ready) return;
     handle(run.update(dt));
-    music.setIntensity(Math.max(s.chase, (s.speed - 10) / 11, s.rush > 0 ? 1 : 0));
+    music.setIntensity(Math.max(s.chase, (s.speed - 10) / 11, s.rush > 0 || s.turbo > 0 ? 1 : 0));
     if (s.phase === "over" && !ended) {
       ended = true;
       ctx.onEnd(runResult(ctx, run));
@@ -437,11 +515,21 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
     const sliding = s.slide > 0 && s.grounded && s.phase === "run";
     slideLean = lerp(slideLean, sliding ? 1 : 0, Math.min(1, frameDt * 16));
     const wobble = s.sinceStumble < 0.6 ? Math.sin(s.sinceStumble * 34) * 0.22 * (1 - s.sinceStumble / 0.6) : 0;
+    // Turbo crash: pitch forward, catch himself, straight back up.
+    const knock = s.knock > 0 ? Math.sin((1 - s.knock / RUN.knockSeconds) * Math.PI) : 0;
+    r.position.y -= knock * 0.2;
     // Facing -z (rotation.y = π), so leaning back is a negative x tilt in local terms.
     // Caught: turn round to face the police coming up behind.
     const turn = s.phase === "caught" || s.phase === "over" ? clamp((s.clock - s.caughtAt) / 0.5, 0, 1) : 0;
-    r.rotation.set(-slideLean * 1.05, Math.PI * (1 - turn) + (s.laneT < 1 ? (s.x - s.fromX > 0 ? -0.2 : 0.2) * (1 - s.laneT) : 0), wobble, "YXZ");
-    if (s.phase === "run" || s.phase === "intro") thief.setTimeScale(sliding ? 0.35 : clamp(s.speed / 8.5, 0.9, 1.85));
+    r.rotation.set(-slideLean * 1.05 + knock * 0.55, Math.PI * (1 - turn) + (s.laneT < 1 ? (s.x - s.fromX > 0 ? -0.2 : 0.2) * (1 - s.laneT) : 0), wobble, "YXZ");
+    if (s.phase === "run" || s.phase === "intro") thief.setTimeScale(sliding ? 0.35 : clamp(s.speed / 8.5, 0.9, s.turbo > 0 ? 2.8 : 1.85));
+    if (aura) {
+      aura.visible = s.turbo > 0 && s.phase === "run";
+      if (aura.visible) {
+        aura.position.set(s.x, r.position.y + 0.9, -s.dist - 0.3);
+        aura.material.opacity = Math.min(1, s.turbo / 0.6) * (0.75 + Math.sin(performance.now() / 70) * 0.25);
+      }
+    }
     thief.update(frameDt);
     if (jumpPose && !s.grounded && s.phase === "run") thief.blendPose(jumpPose, clamp(s.y / 0.45, 0, 1) * 0.85);
 
@@ -504,6 +592,7 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
     syncObstacles();
     syncCoins(now / 1000);
     syncSnacks(now / 1000, frameDt);
+    syncBoosts(now / 1000);
     recycleSegments();
     animateRunner(frameDt);
     for (const v of views.values()) v.rider?.update(frameDt);
@@ -547,7 +636,7 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
     if (shake > 0 && !ctx.reducedMotion) camPos.add(new THREE.Vector3((Math.random() - 0.5) * shake * 0.25, (Math.random() - 0.5) * shake * 0.2, 0));
     stage.camera.position.copy(camPos);
     stage.camera.lookAt(camLook);
-    const fov = 60 + clamp((s.speed - 10) * 0.7, 0, 9);
+    const fov = 60 + clamp((s.speed - 10) * 0.7, 0, s.turbo > 0 ? 20 : 9);
     if (Math.abs(stage.camera.fov - fov) > 0.05) {
       stage.camera.fov = lerp(stage.camera.fov, fov, Math.min(1, frameDt * 3));
       stage.camera.updateProjectionMatrix();
@@ -615,21 +704,30 @@ export function createPoliceRun3D(ctx: EngineContext): GameEngine {
       g.fillStyle = "rgba(255,255,255,0.14)";
       g.fill();
       roundRect(g, ex + 10, ey + 19, Math.max(4, (ew - 20) * s.energy), 8, 4);
-      g.fillStyle = s.rush > 0 ? "#7ec8ff" : low ? (Math.floor(time * 4) % 2 ? "#ff5d5d" : "#ff9f43") : "#7ee08a";
+      g.fillStyle = s.turbo > 0 ? "#7cff8a" : s.rush > 0 ? "#7ec8ff" : low ? (Math.floor(time * 4) % 2 ? "#ff5d5d" : "#ff9f43") : "#7ee08a";
       g.fill();
-      if (s.rush > 0) hudText(g, "RUSH", ex + ew - 10, ey + 11, { size: 10, font: font.body, weight: 800, color: "#7ec8ff", align: "right", shadow: false });
+      if (s.turbo > 0) {
+        hudText(g, "TURBO", ex + ew - 10, ey + 11, { size: 10, font: font.body, weight: 800, color: "#7cff8a", align: "right", shadow: false });
+        // Agbo left: a gold line along the bottom of the panel.
+        roundRect(g, ex + 10, ey + 30, (ew - 20) * (s.turbo / RUN.turboSeconds), 2, 1);
+        g.fillStyle = "#ffd54f";
+        g.fill();
+      } else if (s.rush > 0) hudText(g, "RUSH", ex + ew - 10, ey + 11, { size: 10, font: font.body, weight: 800, color: "#7ec8ff", align: "right", shadow: false });
     }
 
-    // Sugar rush: speed streaks at the edges.
-    if (s.rush > 0 && s.phase === "run" && !ctx.reducedMotion) {
-      g.strokeStyle = "rgba(200,230,255,0.35)";
-      g.lineWidth = 2;
-      for (let k = 0; k < 14; k++) {
-        const a = (k / 14) * Math.PI * 2 + time * 0.5;
-        const r0 = Math.max(W, H) * (0.45 + ((time * 2 + k * 0.37) % 1) * 0.2);
+    // Sugar rush / agbo turbo: speed streaks at the edges (thicker and faster on turbo).
+    if ((s.rush > 0 || s.turbo > 0) && s.phase === "run" && !ctx.reducedMotion) {
+      const turbo = s.turbo > 0;
+      g.strokeStyle = turbo ? "rgba(170,255,170,0.45)" : "rgba(200,230,255,0.35)";
+      g.lineWidth = turbo ? 3 : 2;
+      const n = turbo ? 26 : 14;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2 + time * 0.5;
+        const r0 = Math.max(W, H) * ((turbo ? 0.38 : 0.45) + ((time * (turbo ? 3.5 : 2) + k * 0.37) % 1) * 0.2);
+        const len = turbo ? 110 : 60;
         g.beginPath();
         g.moveTo(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0);
-        g.lineTo(W / 2 + Math.cos(a) * (r0 + 60), H / 2 + Math.sin(a) * (r0 + 60));
+        g.lineTo(W / 2 + Math.cos(a) * (r0 + len), H / 2 + Math.sin(a) * (r0 + len));
         g.stroke();
       }
     }
