@@ -11,7 +11,7 @@ import { createBoardDecal, toWorld } from "@/games/suwe/board3d";
 import { CLASSIC, makeBoard } from "@/games/suwe/rules";
 import { buildPlace } from "@/games/core3d/places";
 import { buildYard } from "@/games/hide-seek/yard3d";
-import { measureArms, reach } from "@/games/hand-slap/arms";
+import { flattenFingers, measureArms, orientHand, reach } from "@/games/hand-slap/arms";
 
 const X = new THREE.Vector3(1, 0, 0);
 const Z = new THREE.Vector3(0, 0, 1);
@@ -157,33 +157,48 @@ const SHOTS: Record<string, (c: Ctx) => Promise<void>> = {
     camera.fov = 46;
     focus(new THREE.Vector3(-1.5, 0, -5));
   },
-  /** Backhand slap: Emeka's hands whip down as Ada yanks hers away. */
+  /** Backhand slap: Emeka's hands whip over as Ada yanks hers away. */
   async "hand-slap"({ scene, camera, focus, spot }) {
-    const ada = await person(scene, "ada", "idle_f", spot.x + 0.42, spot.z, -Math.PI / 2, 0.3);
-    const emeka = await person(scene, "emeka", "idle_m", spot.x - 0.42, spot.z, Math.PI / 2, 0.6);
-    const y = (ada.bone("L UpperArm")?.getWorldPosition(new THREE.Vector3()).y ?? 1.1) - 0.3;
-    for (const [c, fwd, attacking] of [
-      [emeka, 1, true],
-      [ada, -1, false],
+    const ada = await person(scene, "ada", "idle_f", spot.x, spot.z, -Math.PI / 2, 0.3);
+    const emeka = await person(scene, "emeka", "idle_m", spot.x, spot.z, Math.PI / 2, 0.6);
+    const ra = measureArms(ada);
+    const re = measureArms(emeka);
+    const gap = Math.min(ra.len.L[0] + ra.len.L[1], re.len.L[0] + re.len.L[1]) * 0.62;
+    ada.root.position.x = spot.x + gap;
+    emeka.root.position.x = spot.x - gap;
+    ada.update(0.001);
+    emeka.update(0.001);
+    const y = (ada.bone("L UpperArm")?.getWorldPosition(new THREE.Vector3()).y ?? 1.1) - 0.36;
+    const k = 0.62;
+    const arc = Math.sin(k * Math.PI);
+    for (const [c, rig, f, attacking] of [
+      [emeka, re, 1, true],
+      [ada, ra, -1, false],
     ] as const) {
-      const rig = measureArms(c);
+      const fwd = new THREE.Vector3(f, 0, 0);
+      const tip = new THREE.Vector3(0, 0, -f);
+      c.rotateWorld("Spine1", tip, attacking ? 0.2 : -0.05);
+      c.rotateWorld("Head", tip, 0.4);
       for (const side of ["L", "R"] as const) {
         const sh = c.bone(`${side} UpperArm`)!.getWorldPosition(new THREE.Vector3());
         const lateral = new THREE.Vector3(0, 0, sh.z - spot.z);
+        const out = lateral.clone().normalize();
         const target = attacking
-          ? new THREE.Vector3(spot.x - 0.02, y + 0.14, spot.z + lateral.z * 0.75)
-          : sh.clone().add(new THREE.Vector3(fwd * 0.14, -0.3, -lateral.z * 0.3));
-        const thumb = attacking ? new THREE.Vector3(0, 0.3, -Math.sign(lateral.z)) : new THREE.Vector3(0, 0, -Math.sign(lateral.z));
-        reach(c, rig, side, target, new THREE.Vector3(0, -1, Math.sign(lateral.z) * 0.6), thumb);
+          ? new THREE.Vector3(spot.x, y, spot.z).add(lateral.clone().multiplyScalar(0.8)).add(fwd.clone().multiplyScalar(-0.1 + 0.1 * k)).add(new THREE.Vector3(0, -0.06 + 0.095 * k + 0.1 * arc, 0)).add(out.clone().multiplyScalar(0.13 * arc))
+          : sh.clone().add(fwd.clone().multiplyScalar(0.05)).add(new THREE.Vector3(0, -0.42, 0)).add(out.clone().multiplyScalar(0.06));
+        const thumb = attacking ? out.clone().multiplyScalar(Math.cos(k * Math.PI)).add(new THREE.Vector3(0, Math.sin(k * Math.PI), 0)) : out.clone().negate();
+        const fingers = attacking ? fwd.clone().add(new THREE.Vector3(0, -0.25 * k, 0)) : fwd.clone().lerp(new THREE.Vector3(0, -1, 0), 0.6);
+        reach(c, rig, side, target, new THREE.Vector3(0, -1, 0).add(fwd.clone().multiplyScalar(-0.7)).add(out.clone().multiplyScalar(0.35)));
+        orientHand(c, side, fingers, thumb);
+        flattenFingers(c, side, 0.85);
       }
     }
-    ada.rotateWorld("Spine1", new THREE.Vector3(0, 0, 1), -0.12);
-    await person(scene, "tunde", "cheer_m", spot.x - 0.3, spot.z + 2.2, Math.PI, 0.35);
-    await person(scene, "aisha", "clap_f", spot.x + 1.1, spot.z + 1.7, Math.PI - 0.5, 0.6);
-    await person(scene, "tunde", "clap_m", spot.x - 1.8, spot.z + 1.6, Math.PI + 0.6, 0.15);
-    camera.position.set(spot.x + 0.15, y + 0.42, spot.z - 1.8);
-    camera.lookAt(spot.x, y + 0.2, spot.z);
-    camera.fov = 48;
+    await person(scene, "tunde", "cheer_m", spot.x - 0.3, spot.z + 1.9, Math.PI, 0.35);
+    await person(scene, "aisha", "clap_f", spot.x + 1.0, spot.z + 1.5, Math.PI - 0.5, 0.6);
+    await person(scene, "tunde", "clap_m", spot.x - 1.4, spot.z + 1.4, Math.PI + 0.6, 0.15);
+    camera.position.set(spot.x + 0.2, y + 0.75, spot.z - 1.35);
+    camera.lookAt(spot.x, y + 0.28, spot.z);
+    camera.fov = 50;
     focus(spot);
   },
   async playground({ scene, camera, focus }) {

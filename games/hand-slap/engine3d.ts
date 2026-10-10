@@ -11,7 +11,7 @@ import { createNaijaMusic } from "@/games/core/naija-music";
 import { createCountVoice } from "@/games/skipping/shared";
 import { FEINT, TARGET, WINDOW } from "./rules";
 import type { SlapEvent } from "./match";
-import { measureArms, reach, type ArmRig } from "./arms";
+import { flattenFingers, measureArms, orientHand, reach, type ArmRig } from "./arms";
 import { OPPONENT, bindSlapKeys, buildSlapResult, roleLine, slapText, startSlapMatch, youGotHit } from "./shared";
 
 interface Player {
@@ -24,7 +24,6 @@ interface Player {
   thumbs: Record<"L" | "R", THREE.Vector3>;
 }
 
-const UP = new THREE.Vector3(0, 1, 0);
 
 /** Backhand slap, side-on: you on the left, Emeka on the right, hands in the middle. */
 export function createHandSlap3D(ctx: EngineContext): GameEngine {
@@ -78,7 +77,8 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
     const rigs = [measureArms(you), measureArms(cpu)];
     // Stand so both pairs of hands meet comfortably in the middle.
     const reachLen = Math.min(rigs[0]!.len.L[0] + rigs[0]!.len.L[1], rigs[1]!.len.L[0] + rigs[1]!.len.L[1]);
-    const gap = reachLen * 0.78 + 0.08;
+    // Close enough that, elbows bent, one pair of hands rests on the other.
+    const gap = reachLen * 0.62;
     you.root.position.x = spot.x + gap;
     cpu.root.position.x = spot.x - gap;
     for (const [i, c] of [you, cpu].entries()) {
@@ -177,70 +177,83 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
     const t = st.clock;
     const att = players[st.attacker]!;
     const def = players[st.attacker === 0 ? 1 : 0]!;
-    const shoulderY = att.char.bone("L UpperArm")?.getWorldPosition(new THREE.Vector3()).y ?? 1.1;
-    const meet = new THREE.Vector3(spot.x, Math.min(shoulderY, def.char.bone("L UpperArm")?.getWorldPosition(new THREE.Vector3()).y ?? 1.1) - 0.3, spot.z);
+    const shoulder = (p: Player) => p.char.bone("L UpperArm")?.getWorldPosition(new THREE.Vector3()).y ?? 1.1;
+    // Hands meet about waist high, elbows bent.
+    const meet = new THREE.Vector3(spot.x, Math.min(shoulder(att), shoulder(def)) - 0.36, spot.z);
     meetY = meet.y;
     const strike = st.strike;
     const sinceOutcome = st.outcome ? t - st.outcome.at : 99;
     const showing = st.phase === "after" || st.phase === "end";
+    const pulled = st.pulledAt !== null && t >= st.pulledAt;
     for (const p of players) {
       const attacking = p === att;
       const center = p.char.root.position;
+      // Lean in a little and look down at the hands.
+      // Rotating about up × forward tips the body forward (positive = down).
+      const tip = new THREE.Vector3(p.fwd.z, 0, -p.fwd.x);
+      p.char.rotateWorld("Spine1", tip, 0.12);
+      p.char.rotateWorld("Head", tip, 0.38);
       for (const side of ["L", "R"] as const) {
         const sh = p.char.bone(`${side} UpperArm`)?.getWorldPosition(new THREE.Vector3());
         if (!sh) continue;
-        // Hands sit a little apart, each in line with its own shoulder.
         const lateral = sh.clone().sub(center).setY(0);
         lateral.sub(p.fwd.clone().multiplyScalar(lateral.dot(p.fwd)));
-        const across = lateral.clone().normalize();
-        const target = meet.clone().add(lateral.clone().multiplyScalar(0.75));
-        // Attacker underneath with palms up; defender resting on top, palms down.
-        target.y += attacking ? -0.035 : 0.035;
-        target.add(p.fwd.clone().multiplyScalar(attacking ? 0.02 : -0.02));
-        let thumb = attacking ? across.clone() : across.clone().negate();
+        const out = lateral.clone().normalize();
+        // Wrists a little back from the middle so palms overlap: the attacker's
+        // palms up underneath, the defender's palms down resting on them.
+        const target = meet.clone().add(lateral.clone().multiplyScalar(0.8)).add(p.fwd.clone().multiplyScalar(-0.06));
+        target.y += attacking ? -0.02 : 0.022;
+        let fingers = p.fwd.clone().add(new THREE.Vector3(0, -0.05, 0));
+        let thumb = attacking ? out.clone() : out.clone().negate();
         let snap = false;
-        if (attacking) {
-          if (strike) {
-            const u = t - strike.at;
-            if (u < strike.windup) {
-              // Wind-up: hands drop and draw back (the tell).
-              const k = u / strike.windup;
-              target.y -= 0.12 * k;
-              target.add(p.fwd.clone().multiplyScalar(-0.06 * k));
-            } else {
-              // Whip up and over onto the backs of the other hands, flipping palms down.
-              const k = clamp((u - strike.windup) / strike.travel, 0, 1);
-              const landY = 0.035 + 0.075;
-              target.y += -0.12 + (0.12 + landY) * k + 0.22 * Math.sin(k * Math.PI);
-              target.add(p.fwd.clone().multiplyScalar(-0.06 + 0.1 * k));
-              thumb = across.clone().lerp(across.clone().negate(), k).add(UP.clone().multiplyScalar(0.3 * (1 - Math.abs(2 * k - 1))));
-            }
-            snap = true;
-          } else if (st.feint && st.feint.by === st.attacker) {
-            const k = (t - st.feint.at) / FEINT.dur;
-            target.y -= 0.11 * Math.sin(Math.PI * clamp(k, 0, 1));
-            target.add(p.fwd.clone().multiplyScalar(-0.05 * Math.sin(Math.PI * clamp(k, 0, 1))));
-            snap = true;
+        if (attacking && strike) {
+          const u = t - strike.at;
+          if (u < strike.windup) {
+            // The tell: hands sink and draw back a touch.
+            const k = u / strike.windup;
+            target.y -= 0.04 * k;
+            target.add(p.fwd.clone().multiplyScalar(-0.04 * k));
+          } else {
+            // Whip out round the side of his hands and over, landing palm-down on their backs.
+            const k = clamp((u - strike.windup) / strike.travel, 0, 1);
+            const arc = Math.sin(k * Math.PI);
+            target.y += -0.04 + (0.04 + 0.055) * k + 0.1 * arc;
+            target.add(out.clone().multiplyScalar(0.13 * arc));
+            target.add(p.fwd.clone().multiplyScalar(-0.04 + 0.1 * k));
+            // Palm turns over: thumb out, then up, then in.
+            const a = k * Math.PI;
+            thumb = out.clone().multiplyScalar(Math.cos(a)).add(new THREE.Vector3(0, Math.sin(a), 0));
+            fingers = p.fwd.clone().add(new THREE.Vector3(0, -0.25 * k, 0));
           }
-        } else {
-          if (st.pulledAt !== null && t >= st.pulledAt) {
-            // Yank the hands back to the chest.
-            const k = clamp((t - st.pulledAt) / 0.1, 0, 1);
-            target.lerp(sh.clone().add(p.fwd.clone().multiplyScalar(0.12)).add(new THREE.Vector3(0, -0.3, 0)).add(lateral.clone().multiplyScalar(-0.3)), k);
-            snap = true;
-          } else if (showing && sinceOutcome < 0.9 && st.strike) {
-            // Just got slapped: hands knocked down, a sting-shake.
-            const k = Math.exp(-sinceOutcome * 5);
-            target.y -= 0.1 * k;
-            target.z += Math.sin(sinceOutcome * 60) * 0.03 * k;
-          }
+          snap = true;
+        } else if (attacking && st.feint && st.feint.by === st.attacker) {
+          // A fake: the same sink and twitch out, then nothing.
+          const k = Math.sin(Math.PI * clamp((t - st.feint.at) / FEINT.dur, 0, 1));
+          target.y -= 0.035 * k;
+          target.add(out.clone().multiplyScalar(0.04 * k));
+          snap = true;
+        } else if (!attacking && pulled) {
+          // Yank the hands back to the hips.
+          const k = clamp((t - st.pulledAt!) / 0.09, 0, 1);
+          target.lerp(sh.clone().add(p.fwd.clone().multiplyScalar(0.05)).add(new THREE.Vector3(0, -0.42, 0)).add(out.clone().multiplyScalar(0.06)), k);
+          fingers = p.fwd.clone().lerp(new THREE.Vector3(0, -1, 0), 0.6 * k);
+          snap = true;
+        } else if (!attacking && showing && strike && sinceOutcome < 1) {
+          // Just got slapped: hands knocked down, then a sting-shake.
+          const k = Math.exp(-sinceOutcome * 4);
+          target.y -= 0.07 * k;
+          target.add(out.clone().multiplyScalar(Math.sin(sinceOutcome * 55) * 0.025 * k));
+          snap = true;
         }
-        const rate = snap ? 60 : 12;
+        const rate = snap ? 70 : 12;
         if (p.hands[side].lengthSq() === 0) p.hands[side].copy(target);
         else p.hands[side].lerp(target, 1 - Math.exp(-rate * dt));
-        p.thumbs[side].lerp(thumb, 1 - Math.exp(-(snap ? 40 : 12) * dt));
-        const pole = across.clone().multiplyScalar(0.6).add(new THREE.Vector3(0, -1, 0));
-        reach(p.char, p.rig, side, p.hands[side], pole, p.thumbs[side].lengthSq() > 0.01 ? p.thumbs[side] : thumb);
+        p.thumbs[side].lerp(thumb, 1 - Math.exp(-(snap ? 45 : 12) * dt));
+        // Elbows down, back and slightly out.
+        const pole = new THREE.Vector3(0, -1, 0).add(p.fwd.clone().multiplyScalar(-0.7)).add(out.clone().multiplyScalar(0.35));
+        reach(p.char, p.rig, side, p.hands[side], pole);
+        orientHand(p.char, side, fingers, p.thumbs[side].lengthSq() > 0.01 ? p.thumbs[side] : thumb);
+        flattenFingers(p.char, side, 0.85);
       }
     }
   }
@@ -268,8 +281,9 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
     stage.camera.updateProjectionMatrix();
     const jolt = shake * 0.02;
     const handY = meetY || 0.85;
-    stage.camera.position.set(spot.x + 0.15 + Math.sin(now * 0.09) * jolt, handY + 0.75 + 0.1 * portrait, spot.z - 2.0 - 0.7 * portrait);
-    stage.camera.lookAt(spot.x, handY + 0.08 + 0.02 * portrait, spot.z);
+    // Looking down onto the hands, so you can see whose are on top.
+    stage.camera.position.set(spot.x + 0.15 + Math.sin(now * 0.09) * jolt, handY + 0.95 + 0.15 * portrait, spot.z - 1.65 - 0.5 * portrait);
+    stage.camera.lookAt(spot.x, handY + 0.18 + 0.12 * portrait, spot.z);
     stage.focusShadows(spot);
     stage.render();
     drawHud();
