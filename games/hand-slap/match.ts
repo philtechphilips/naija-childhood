@@ -50,6 +50,10 @@ export function createSlapMatch(opts: { difficulty: Difficulty; seed: number }) 
     cpuNextFeint: 0,
     cpuReact: 0,
     feintsThisTurn: 0,
+    /** Turns started as slapper: [you, CPU]. */
+    turnsAs: [0, 0] as [number, number],
+    /** Extra seconds before "3, 2, 1" (the first turn each way, to read the tip). */
+    intro: 0,
     log: [] as number[],
     won: false,
   };
@@ -65,6 +69,8 @@ export function createSlapMatch(opts: { difficulty: Difficulty; seed: number }) 
     st.feint = null;
     st.pulledAt = null;
     st.feintsThisTurn = 0;
+    st.turnsAs[st.attacker]++;
+    st.intro = st.turnsAs[st.attacker] === 1 ? 3.5 : 0;
     ev.push({ type: "turn", attacker: st.attacker });
   }
 
@@ -105,7 +111,9 @@ export function createSlapMatch(opts: { difficulty: Difficulty; seed: number }) 
     if (st.feint && st.clock - st.feint.at > FEINT.dur) st.feint = null;
 
     if (st.phase === "count") {
-      const beat = Math.floor((st.clock - st.phaseAt) / COUNT_BEAT);
+      const into = st.clock - st.phaseAt - st.intro;
+      if (into < 0) return ev;
+      const beat = Math.floor(into / COUNT_BEAT);
       if (beat >= 3) {
         st.phase = "open";
         st.phaseAt = st.clock;
@@ -156,6 +164,8 @@ export function createSlapMatch(opts: { difficulty: Difficulty; seed: number }) 
   function press(action: "act" | "fake"): SlapEvent[] {
     const ev: SlapEvent[] = [];
     if (st.phase === "end" || st.phase === "after") return ev;
+    // Still reading the tip before the count: presses don't count yet.
+    if (st.phase === "count" && st.clock - st.phaseAt < st.intro) return ev;
     if (st.attacker === 0) {
       if (st.phase === "count") {
         if (action === "act") ev.push({ type: "early" });

@@ -6,7 +6,7 @@ import { createNaijaMusic } from "@/games/core/naija-music";
 import { createCountVoice } from "@/games/skipping/shared";
 import { FEINT, TARGET, WINDOW } from "./rules";
 import type { SlapEvent } from "./match";
-import { OPPONENT, bindSlapKeys, buildSlapResult, roleLine, slapText, startSlapMatch } from "./shared";
+import { OPPONENT, PULL_CONTROLS, SLAP_CONTROLS, bindSlapKeys, buildSlapResult, coachTip, roleLine, slapText, startSlapMatch, turnTitle } from "./shared";
 
 /** Lightweight backhand slap: four hands seen from above, yours at the bottom. */
 export function createHandSlapEngine(ctx: EngineContext): GameEngine {
@@ -31,7 +31,8 @@ export function createHandSlapEngine(ctx: EngineContext): GameEngine {
     for (const e of ev) {
       const t = slapText(e);
       if (t) banner = { ...t, age: 0 };
-      if (e.type === "count") voice.count(e.n);
+      if (e.type === "turn") ctx.setControls?.(e.attacker === 0 ? SLAP_CONTROLS : PULL_CONTROLS);
+      else if (e.type === "count") voice.count(e.n);
       else if (e.type === "go") {
         ctx.sfx.play("go", 0.6);
         music.start();
@@ -135,8 +136,9 @@ export function createHandSlapEngine(ctx: EngineContext): GameEngine {
       drawPair(0, false);
       drawPair(1, true);
     }
-    hudText(g, OPPONENT.name, W / 2, cy - 150 * s, { size: 13, font: font.body, weight: 800, color: "#fff", stroke: "rgba(0,0,0,0.5)", strokeWidth: 3 });
+    hudText(g, OPPONENT.name.toUpperCase(), W / 2, cy - 150 * s, { size: 13, font: font.body, weight: 800, color: "#fff", stroke: "rgba(0,0,0,0.5)", strokeWidth: 3 });
 
+    hudText(g, "YOUR HANDS", W / 2, cy + 150 * s, { size: 13, font: font.body, weight: 800, color: "#ffd166", stroke: "rgba(0,0,0,0.5)", strokeWidth: 3 });
     if (flash > 0) {
       g.fillStyle = `rgba(220,30,30,${0.35 * flash})`;
       g.fillRect(0, 0, W, H);
@@ -155,8 +157,30 @@ export function createHandSlapEngine(ctx: EngineContext): GameEngine {
     const line = roleLine(m);
     if (line) hudText(g, line, W / 2, 92, { size: Math.min(16, W / 24), font: font.body, weight: 800, color: "#fff", stroke: "rgba(0,0,0,0.5)", strokeWidth: 4 });
     if (st.phase === "count") {
-      const n = 3 - Math.floor((t - st.phaseAt) / 0.5);
-      hudText(g, String(clamp(n, 1, 3)), W / 2, cy, { size: 96, font: font.display, color: "#fff", stroke: "rgba(0,0,0,0.5)" });
+      const tt = turnTitle(m);
+      hudText(g, tt.title, W / 2, 130, { size: Math.min(28, W / 13), font: font.display, color: tt.color, stroke: "rgba(0,0,0,0.6)" });
+      const into = t - st.phaseAt - st.intro;
+      if (into >= 0) hudText(g, String(clamp(3 - Math.floor(into / 0.5), 1, 3)), W / 2, cy, { size: 96, font: font.display, color: "#fff", stroke: "rgba(0,0,0,0.5)" });
+    }
+    const tip = coachTip(m, st.turnsAs);
+    if (tip) {
+      const bw = Math.min(W - 24, 460);
+      g.font = `700 14px ${font.body}`;
+      const lines: string[] = [];
+      let cur = "";
+      for (const word of tip.split(" ")) {
+        const next = cur ? `${cur} ${word}` : word;
+        if (g.measureText(next).width > bw - 28 && cur) {
+          lines.push(cur);
+          cur = word;
+        } else cur = next;
+      }
+      if (cur) lines.push(cur);
+      const bh = 22 + lines.length * 20;
+      roundRect(g, W / 2 - bw / 2, H - bh - 14, bw, bh, 14);
+      g.fillStyle = "rgba(12,16,14,0.85)";
+      g.fill();
+      lines.forEach((l, i) => hudText(g, l, W / 2, H - bh - 14 + 21 + i * 20, { size: 14, font: font.body, weight: 700, color: "#fff", shadow: false }));
     }
     if (st.phase === "open" && st.attacker === 0 && !strike) {
       const left = clamp(1 - (t - st.phaseAt) / WINDOW, 0, 1);

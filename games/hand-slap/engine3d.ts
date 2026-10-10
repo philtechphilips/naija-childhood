@@ -12,7 +12,7 @@ import { createCountVoice } from "@/games/skipping/shared";
 import { FEINT, TARGET, WINDOW } from "./rules";
 import type { SlapEvent } from "./match";
 import { flattenFingers, measureArms, orientHand, reach, type ArmRig } from "./arms";
-import { OPPONENT, bindSlapKeys, buildSlapResult, roleLine, slapText, startSlapMatch, youGotHit } from "./shared";
+import { OPPONENT, PULL_CONTROLS, SLAP_CONTROLS, bindSlapKeys, buildSlapResult, coachTip, roleLine, slapText, startSlapMatch, turnTitle, youGotHit } from "./shared";
 
 interface Player {
   char: Character;
@@ -46,11 +46,14 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
   let endWait = 0;
   let progress = 0;
   let place: Place | null = null;
+  let youRing: THREE.Mesh | null = null;
   const players: Player[] = [];
   let crowd: Character[] = [];
   const spot = new THREE.Vector3();
   let banner: { text: string; color: string; sub?: string; age: number } | null = null;
   let flash = 0;
+  /** 1 when a new turn starts, fading: makes the turn title pop. */
+  let turnPop = 0;
   let shake = 0;
   let lastFrame = performance.now();
   /** Resting height where the hands meet (the camera frames this). */
@@ -85,6 +88,10 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
       const fwd = new THREE.Vector3(i === 0 ? -1 : 1, 0, 0);
       players.push({ char: c, rig: rigs[i]!, fwd, hands: { L: new THREE.Vector3(), R: new THREE.Vector3() }, thumbs: { L: new THREE.Vector3(), R: new THREE.Vector3() } });
     }
+    // A yellow ring under your feet, so you always know which one is you.
+    youRing = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.32, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }));
+    youRing.position.set(you.root.position.x, 0.03, you.root.position.z);
+    stage.scene.add(youRing);
     progress = 0.75;
     // Friends crowding round to watch.
     const ring: [string, string, number, number, number][] = [];
@@ -119,6 +126,10 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
       const t = slapText(e);
       if (t) banner = { ...t, age: 0 };
       switch (e.type) {
+        case "turn":
+          ctx.setControls?.(e.attacker === 0 ? SLAP_CONTROLS : PULL_CONTROLS);
+          turnPop = 1;
+          break;
         case "count":
           voice.count(e.n);
           break;
@@ -161,6 +172,7 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
       if (banner.age > 1.6) banner = null;
     }
     flash = Math.max(0, flash - dt * 2.5);
+    turnPop = Math.max(0, turnPop - dt * 2);
     shake = Math.max(0, shake - dt * 4);
     music.setIntensity(st.phase === "open" ? 0.8 : 0.45);
     if (st.phase === "end" && (endWait += dt) > 2.6) finish();
@@ -201,7 +213,8 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
         const out = lateral.clone().normalize();
         // Wrists a little back from the middle so palms overlap: the attacker's
         // palms up underneath, the defender's palms down resting on them.
-        const target = meet.clone().add(lateral.clone().multiplyScalar(0.8)).add(p.fwd.clone().multiplyScalar(-0.06));
+        // Both kids' hands on the same two lines, so each pair stacks neatly.
+        const target = meet.clone().add(out.clone().multiplyScalar(0.12)).add(p.fwd.clone().multiplyScalar(-0.085));
         target.y += attacking ? -0.02 : 0.022;
         let fingers = p.fwd.clone().add(new THREE.Vector3(0, -0.05, 0));
         let thumb = attacking ? out.clone() : out.clone().negate();
@@ -253,7 +266,7 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
         const pole = new THREE.Vector3(0, -1, 0).add(p.fwd.clone().multiplyScalar(-0.7)).add(out.clone().multiplyScalar(0.35));
         reach(p.char, p.rig, side, p.hands[side], pole);
         orientHand(p.char, side, fingers, p.thumbs[side].lengthSq() > 0.01 ? p.thumbs[side] : thumb);
-        flattenFingers(p.char, side, 0.85);
+        flattenFingers(p.char, side, 1);
       }
     }
   }
@@ -282,8 +295,8 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
     const jolt = shake * 0.02;
     const handY = meetY || 0.85;
     // Looking down onto the hands, so you can see whose are on top.
-    stage.camera.position.set(spot.x + 0.15 + Math.sin(now * 0.09) * jolt, handY + 0.95 + 0.15 * portrait, spot.z - 1.65 - 0.5 * portrait);
-    stage.camera.lookAt(spot.x, handY + 0.18 + 0.12 * portrait, spot.z);
+    stage.camera.position.set(spot.x + 0.1 + Math.sin(now * 0.09) * jolt, handY + 0.82 + 0.12 * portrait, spot.z - 1.3 - 0.45 * portrait);
+    stage.camera.lookAt(spot.x, handY + 0.22 + 0.1 * portrait, spot.z);
     stage.focusShadows(spot);
     stage.render();
     drawHud();
@@ -314,32 +327,78 @@ export function createHandSlap3D(ctx: EngineContext): GameEngine {
     row(18, 1, "YOU", st.points[0], "#ffd166");
     row(W - 18, -1, OPPONENT.name.toUpperCase(), st.points[1], "#ff9f7a");
 
-    // Whose turn
-    const line = roleLine(m);
-    if (line) hudText(g, line, W / 2, top + 82, { size: Math.min(16, W / 24), font: font.body, weight: 800, color: st.attacker === 0 ? "#ffd166" : "#7ec8ff", stroke: "rgba(0,0,0,0.6)", strokeWidth: 4 });
+    // Name tags over each kid; the slapper this turn gets a hand.
+    players.forEach((p, i) => {
+      const head = p.char.bone("Head")?.getWorldPosition(new THREE.Vector3());
+      if (!head) return;
+      const q = overlay.project(head.add(new THREE.Vector3(0, 0.17, 0)), stage.camera);
+      if (!q) return;
+      const label = `${st.attacker === i && st.phase !== "end" ? "👋 " : ""}${i === 0 ? "YOU" : OPPONENT.name.toUpperCase()}`;
+      g.font = `800 13px ${font.body}`;
+      const tw = g.measureText(label).width + 20;
+      roundRect(g, q.x - tw / 2, q.y - 13, tw, 26, 13);
+      g.fillStyle = i === 0 ? "#ffd166" : "#7ec8ff";
+      g.fill();
+      hudText(g, label, q.x, q.y + 1, { size: 13, font: font.body, weight: 800, color: "#14110a", shadow: false });
+    });
 
-    // Countdown
+    // Whose turn: a big title while the count runs, then what to do.
+    const into = st.clock - st.phaseAt - st.intro;
     if (st.phase === "count") {
-      const n = 3 - Math.floor((st.clock - st.phaseAt) / 0.5);
-      const k = ((st.clock - st.phaseAt) % 0.5) / 0.5;
-      hudText(g, String(clamp(n, 1, 3)), W / 2, H * 0.36, { size: 110 - k * 30, font: font.display, color: "#fff", stroke: "rgba(0,0,0,0.5)", alpha: 1 - k * 0.5 });
+      const tt = turnTitle(m);
+      const pop = 1 + turnPop * 0.25;
+      hudText(g, tt.title, W / 2, top + 92, { size: Math.min(30, W / 13) * pop, font: font.display, color: tt.color, stroke: "rgba(0,0,0,0.6)" });
+    }
+    const line = roleLine(m);
+    if (line) hudText(g, line, W / 2, top + (st.phase === "count" ? 128 : 82), { size: Math.min(16, W / 24), font: font.body, weight: 800, color: "#fff", stroke: "rgba(0,0,0,0.65)", strokeWidth: 4 });
+
+    // Countdown (after the reading pause on a first turn)
+    if (st.phase === "count" && into >= 0) {
+      const n = 3 - Math.floor(into / 0.5);
+      const k = (into % 0.5) / 0.5;
+      hudText(g, String(clamp(n, 1, 3)), W / 2, H * 0.42, { size: 110 - k * 30, font: font.display, color: "#fff", stroke: "rgba(0,0,0,0.5)", alpha: 1 - k * 0.5 });
     }
     // Your strike window drains while you wait.
     if (st.phase === "open" && st.attacker === 0 && !st.strike) {
       const left = clamp(1 - (st.clock - st.phaseAt) / WINDOW, 0, 1);
       const bw = Math.min(220, W * 0.55);
-      roundRect(g, W / 2 - bw / 2, top + 100, bw, 8, 4);
+      roundRect(g, W / 2 - bw / 2, top + 104, bw, 8, 4);
       g.fillStyle = "rgba(255,255,255,0.2)";
       g.fill();
-      roundRect(g, W / 2 - bw / 2, top + 100, bw * left, 8, 4);
+      roundRect(g, W / 2 - bw / 2, top + 104, bw * left, 8, 4);
       g.fillStyle = left < 0.3 ? "#ff6b5a" : "#ffd166";
       g.fill();
+    }
+    // First turns: how to play, in a box at the bottom.
+    const tip = coachTip(m, st.turnsAs);
+    if (tip) {
+      const bw = Math.min(W - 24, 460);
+      g.font = `700 14px ${font.body}`;
+      const lines: string[] = [];
+      let cur = "";
+      for (const word of tip.split(" ")) {
+        const next = cur ? `${cur} ${word}` : word;
+        if (g.measureText(next).width > bw - 28 && cur) {
+          lines.push(cur);
+          cur = word;
+        } else cur = next;
+      }
+      if (cur) lines.push(cur);
+      const bh = 22 + lines.length * 20;
+      const by = H - bh - 14;
+      roundRect(g, W / 2 - bw / 2, by, bw, bh, 14);
+      g.fillStyle = "rgba(12,16,14,0.85)";
+      g.fill();
+      g.strokeStyle = st.attacker === 0 ? "#ffd166" : "#7ec8ff";
+      g.lineWidth = 2;
+      g.stroke();
+      lines.forEach((l, i) => hudText(g, l, W / 2, by + 21 + i * 20, { size: 14, font: font.body, weight: 700, color: "#fff", shadow: false }));
     }
     if (banner) {
       const a = banner.age < 1.2 ? 1 : 1 - (banner.age - 1.2) / 0.4;
       const pop = 1 + Math.max(0, 0.25 - banner.age) * 1.5;
-      hudText(g, banner.text, W / 2, H * 0.3, { size: Math.min(54, W / 8) * pop, font: font.display, color: banner.color, stroke: "rgba(0,0,0,0.55)", alpha: a });
-      if (banner.sub) hudText(g, banner.sub, W / 2, H * 0.3 + 44, { size: Math.min(15, W / 26), font: font.body, weight: 800, color: "#fff", stroke: "rgba(0,0,0,0.6)", strokeWidth: 4, alpha: a });
+      hudText(g, banner.text, W / 2, H * 0.34, { size: Math.min(54, W / 8) * pop, font: font.display, color: banner.color, stroke: "rgba(0,0,0,0.55)", alpha: a });
+      if (banner.sub) hudText(g, banner.sub, W / 2, H * 0.34 + 44, { size: Math.min(15, W / 26), font: font.body, weight: 800, color: "#fff", stroke: "rgba(0,0,0,0.6)", strokeWidth: 4, alpha: a });
     }
     if (st.phase === "end" && endWait > 0.6) {
       hudText(g, st.won ? "YOU WIN!" : youGotHit(m) ? "RED HANDS!" : "YOU LOSE", W / 2, H * 0.45, { size: Math.min(56, W / 8), font: font.display, color: st.won ? "#ffd166" : "#ff8a6b", stroke: "rgba(0,0,0,0.5)" });

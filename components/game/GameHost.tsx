@@ -43,6 +43,8 @@ export function GameHost({
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
+  /** Buttons the running engine asked for, overriding the module's default. */
+  const [liveSpec, setLiveSpec] = useState<ControlSpec | null>(null);
   const sound = useSettings((s) => s.sound);
   const music = useSettings((s) => s.music);
   const setSettings = useSettings((s) => s.set);
@@ -84,6 +86,7 @@ export function GameHost({
           if (useSettings.getState().haptics) navigator.vibrate?.(pattern);
         },
         onEnd: (r) => onEndRef.current(r),
+        setControls: setLiveSpec,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "This device can't run the game.");
@@ -95,6 +98,7 @@ export function GameHost({
     return () => {
       engine.destroy();
       engineRef.current = null;
+      setLiveSpec(null);
     };
   }, [module, factory, config, sfx, game.slug, graphics]);
 
@@ -119,7 +123,7 @@ export function GameHost({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const spec: ControlSpec | null = module ? module.controls(config.mode, config.options) : null;
+  const spec: ControlSpec | null = liveSpec ?? (module ? module.controls(config.mode, config.options) : null);
   const overlay = spec?.kind === "joystick" || spec?.kind === "swipe";
 
   return (

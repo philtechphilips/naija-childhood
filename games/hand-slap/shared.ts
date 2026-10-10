@@ -1,4 +1,4 @@
-import type { EngineContext, GameResult } from "@/games/types";
+import type { ControlSpec, EngineContext, GameResult } from "@/games/types";
 import { OUTCOME, type Difficulty } from "./rules";
 import { createSlapMatch, type SlapEvent, type SlapMatch } from "./match";
 
@@ -45,11 +45,39 @@ export function slapText(e: SlapEvent): { text: string; color: string; sub?: str
   }
 }
 
+/** Buttons for each side of the game: slap (and fake) on your turn, one big PULL on his. */
+export const SLAP_CONTROLS: ControlSpec = {
+  kind: "buttons",
+  buttons: [
+    { id: "fake", label: "FAKE", sublabel: "TRICK HIM", key: "F", tone: "secondary" },
+    { id: "act", label: "SLAP!", sublabel: "AFTER GO", key: "Space", tone: "primary" },
+  ],
+};
+export const PULL_CONTROLS: ControlSpec = {
+  kind: "buttons",
+  buttons: [{ id: "act", label: "PULL AWAY!", sublabel: "WHEN HE SWINGS", key: "Space", tone: "accent" }],
+};
+
+/** Who is slapping this turn, in big words. */
+export function turnTitle(m: SlapMatch): { title: string; color: string } {
+  return m.st.attacker === 0 ? { title: "YOUR TURN TO SLAP", color: "#ffd166" } : { title: "EMEKA'S TURN TO SLAP", color: "#7ec8ff" };
+}
+
+/** What to do right now, in plain words. */
 export function roleLine(m: SlapMatch): string {
   const { st } = m;
   if (st.phase === "end") return "";
-  if (st.attacker === 0) return st.phase === "count" ? "You slap. Get ready…" : "SLAP his hands! Or FAKE him out";
-  return st.phase === "count" ? "Emeka slaps. Don't flinch…" : "PULL AWAY when he strikes!";
+  if (st.attacker === 0) return st.phase === "count" ? "Your hands are under his. Wait for GO…" : "Tap SLAP! before he pulls away";
+  return st.phase === "count" ? "Your hands are on top of his. Don't move yet…" : "His hands move? Tap PULL AWAY!";
+}
+
+/** Longer tips for the first turns of each kind, so first-timers know the game. */
+export function coachTip(m: SlapMatch, turnsAs: [number, number]): string | null {
+  const { st } = m;
+  if (st.phase === "end" || st.phase === "after") return null;
+  if (st.attacker === 0 && turnsAs[0] <= 2) return "You're the slapper. After GO, slap the back of Emeka's hands before he pulls them away. Land it and you go again. Miss and it's his turn. FAKE can make him flinch: free slap!";
+  if (st.attacker === 1 && turnsAs[1] <= 2) return "Emeka is the slapper. Keep your hands on his. The moment his hands swing, tap PULL AWAY. Pull in time and it's your turn. But pull at a fake and he gets a free slap!";
+  return null;
 }
 
 export function buildSlapResult(ctx: EngineContext, m: SlapMatch): GameResult {
