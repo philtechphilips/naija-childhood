@@ -354,7 +354,7 @@ async function schoolYard(scene: THREE.Scene, detailed: boolean, withRollers = t
   };
 }
 
-async function compound(scene: THREE.Scene, detailed: boolean): Promise<Place> {
+async function compound(scene: THREE.Scene, detailed: boolean, withRollers: boolean, props: boolean): Promise<Place> {
   const laterite = pbrMaterial("red_laterite_soil_stones", { normalScale: 1.1 });
   const ground = new THREE.Mesh(planeWorldUV(300, 300, 3), laterite);
   ground.receiveShadow = true;
@@ -405,7 +405,7 @@ async function compound(scene: THREE.Scene, detailed: boolean): Promise<Place> {
   tank.position.set(5.2, 0, 8.8);
   scene.add(tank);
   await skyline(scene, 16, -40, 40, 21);
-  if (detailed) {
+  if (detailed && props) {
     await Promise.all([
       placeProp(scene, "portable_generator", -4.6, 8.6, 0.6),
       placeProp(scene, "plastic_jerrycan", -3.9, 9.0, 0.2),
@@ -423,7 +423,7 @@ async function compound(scene: THREE.Scene, detailed: boolean): Promise<Place> {
     stove.castShadow = true;
     scene.add(stove);
   }
-  const rollers = await createTyreRollers(scene, [
+  const rollers = !withRollers ? [] : await createTyreRollers(scene, [
     [new THREE.Vector3(-2.8, 0, -6.5), new THREE.Vector3(2.8, 0, -6.5), new THREE.Vector3(3.6, 0, -4.2), new THREE.Vector3(0, 0, -3.4), new THREE.Vector3(-3.6, 0, -4.2)],
   ]);
   let t = 0;
@@ -471,8 +471,9 @@ async function street(scene: THREE.Scene, detailed: boolean, walkers: number, tr
   };
 }
 
-export async function buildPlace(scene: THREE.Scene, id: PlaceId, opts: { detailed: boolean; walkers: number; traffic: number; rollers?: boolean }): Promise<Place> {
+/** `props: false` leaves the compound yard bare so a game can lay out its own things. */
+export async function buildPlace(scene: THREE.Scene, id: PlaceId, opts: { detailed: boolean; walkers: number; traffic: number; rollers?: boolean; props?: boolean }): Promise<Place> {
   if (id === "school") return schoolYard(scene, opts.detailed, opts.rollers ?? true);
-  if (id === "compound") return compound(scene, opts.detailed);
+  if (id === "compound") return compound(scene, opts.detailed, opts.rollers ?? true, opts.props ?? true);
   return street(scene, opts.detailed, opts.walkers, opts.traffic);
 }

@@ -9,6 +9,8 @@ import { ARM_CHAIN, Character } from "@/games/core3d/character";
 import { createTenTenDecal, GAP, SPOT } from "@/games/ten-ten/decal3d";
 import { createBoardDecal, toWorld } from "@/games/suwe/board3d";
 import { CLASSIC, makeBoard } from "@/games/suwe/rules";
+import { buildPlace } from "@/games/core3d/places";
+import { buildYard } from "@/games/hide-seek/yard3d";
 
 const X = new THREE.Vector3(1, 0, 0);
 const Z = new THREE.Vector3(0, 0, 1);
@@ -133,6 +135,24 @@ const SHOTS: Record<string, (c: Ctx) => Promise<void>> = {
     camera.fov = 44;
     focus(new THREE.Vector3(18, 0, 24.5));
   },
+  /** Boju boju: Ada crouched behind the covered car while Emeka counts at the gate. */
+  async "hide-seek"({ scene, camera, focus }) {
+    const ada = await person(scene, "ada", "crouch_m", -4.5, -3.3, 2.3, 0.55);
+    ada.rotateWorld("Head", new THREE.Vector3(0, 1, 0), 0.3);
+    const emeka = await person(scene, "emeka", "idle_m", 0.9, -7.7, Math.PI, 0.2);
+    // Forearms against the gate, face buried in them: counting.
+    emeka.rotateWorld("R UpperArm", X, -1.9);
+    emeka.rotateWorld("R Forearm", X, -1.2);
+    emeka.rotateWorld("L UpperArm", X, -1.6);
+    emeka.rotateWorld("L Forearm", X, -1.4);
+    emeka.rotateWorld("Head", X, 0.35);
+    await person(scene, "tunde", "run_m", 1.4, -4.6, 0.7, 0.3);
+    await person(scene, "aisha", "run_f", 0.4, -3.0, 0.9, 0.7);
+    camera.position.set(-4.8, 2.1, 0.7);
+    camera.lookAt(-0.6, 0.6, -6.9);
+    camera.fov = 46;
+    focus(new THREE.Vector3(-1.5, 0, -5));
+  },
   async playground({ scene, camera, focus }) {
     await person(scene, "ada", "cheer_f", 16.0, 31.3, Math.PI + 0.25, 0.4);
     await person(scene, "aisha", "clap_f", 16.8, 31.4, Math.PI - 0.2, 0.55);
@@ -156,8 +176,12 @@ export function KeyArt() {
     let raf = 0;
     let alive = true;
     (async () => {
-      await buildStreet(stage.scene, { detailed: true, jail: shot === "police-thief" });
-      const crowd = await createCrowd(stage.scene, { walkers: 30, seed: 5, traffic: 8, rollers: true });
+      const inCompound = shot === "hide-seek";
+      if (inCompound) {
+        await buildPlace(stage.scene, "compound", { detailed: true, walkers: 0, traffic: 0, rollers: false, props: false });
+        await buildYard(stage.scene);
+      } else await buildStreet(stage.scene, { detailed: true, jail: shot === "police-thief" });
+      const crowd = await createCrowd(stage.scene, { walkers: inCompound ? 0 : 30, seed: 5, traffic: inCompound ? 0 : 8, rollers: !inCompound });
       crowd.update(0.001, new THREE.Vector3());
       let subject = new THREE.Vector3();
       await SHOTS[shot]!({

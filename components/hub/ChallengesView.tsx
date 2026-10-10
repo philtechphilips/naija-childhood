@@ -11,7 +11,7 @@ import { Screen } from "./Screen";
 import styles from "./ChallengesView.module.css";
 
 const WEEKDAY = new Intl.DateTimeFormat("en-NG", { weekday: "short" });
-const SHORT: Record<string, string> = { "ten-ten": "Ten-Ten", "police-thief": "P&T", suwe: "Suwe", "sack-race": "Sack", skipping: "Rope" };
+const SHORT: Record<string, string> = { "ten-ten": "Ten-Ten", "police-thief": "P&T", suwe: "Suwe", "sack-race": "Sack", skipping: "Rope", "hide-seek": "Hide" };
 
 export function ChallengesView() {
   const daily = useProfile((s) => s.daily);

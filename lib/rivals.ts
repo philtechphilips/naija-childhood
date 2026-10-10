@@ -40,4 +40,11 @@ export const RIVALS: Record<GameSlug, { name: string; score: number }[]> = {
     { name: "Tiny Toyin", score: 1500 },
     { name: "Shoelace Segun", score: 600 },
   ],
+  "hide-seek": [
+    { name: "Invisible Ifeoma", score: 2100 },
+    { name: "Behind-the-Tank Bolu", score: 1750 },
+    { name: "Sneaky Sadiq", score: 1380 },
+    { name: "Giggly Gbemi", score: 900 },
+    { name: "Always-Found Femi", score: 450 },
+  ],
 };

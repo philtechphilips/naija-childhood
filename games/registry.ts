@@ -75,6 +75,7 @@ export const GAMES: GameDefinition[] = [
       { title: "Dodge", body: "Swipe left or right to change lanes around danfos, kekes and okadas." },
       { title: "Jump & slide", body: "Swipe up over barriers, tables and potholes. Swipe down under poles and banners." },
       { title: "Snatch from hawkers", body: "Grab a sausage roll from the roadside hawker to refill your energy, or an energy drink for a rush. Tired thieves get caught." },
+      { title: "Agbo turbo", body: "Grab the glowing agbo bottle for a few seconds of serious speed. Crash into anything and you just stagger, get up and keep running." },
     ],
     controlsHelp: "Swipe, or use the arrow keys / WASD. Space jumps, Shift slides.",
     modes: [
@@ -220,9 +221,54 @@ export const GAMES: GameDefinition[] = [
     ],
     load: () => import("./skipping").then((m) => m.default),
   },
+  {
+    slug: "hide-seek",
+    name: "Hide & Seek",
+    tagline: "Ready or not, here I come!",
+    description:
+      "Boju boju in the compound. Emeka covers his eyes at the gate and counts. Squeeze in behind the water tank, the covered car or Mama Nkechi's door, and don't move. Or be the seeker and find everybody before they run home free.",
+    photo: "hide-seek",
+    accent: "#9b8cff",
+    difficulty: "Easy",
+    players: "1 player",
+    sessionLength: "1–2 min",
+    howTo: [
+      { title: "Hide while he counts", body: "Run to a glowing spot and press HIDE before Emeka reaches the end of his count." },
+      { title: "Don't move", body: "Moving takes you out of hiding. If he sees you, or finds your spot, race him to the gate." },
+      { title: "Home free", body: "Touch the gate before you're tagged to be home free. Stay hidden till time is up and you win too." },
+      { title: "Or be the seeker", body: "In Seek mode you count, then walk up to spots and press LOOK. Listen for rustles. Tag anyone who runs for the gate." },
+    ],
+    controlsHelp: "Joystick or WASD / arrows to move, Shift to run, Space for HIDE / LOOK.",
+    modes: [
+      { id: "hide", label: "Hide", description: "Emeka is seeking. Don't get found.", available: true },
+      { id: "seek", label: "Seek", description: "You count. Find Ada, Tunde and Aisha.", available: true },
+    ],
+    options: [
+      {
+        id: "difficulty",
+        label: "Difficulty",
+        choices: [
+          { value: "easy", label: "Easy" },
+          { value: "normal", label: "Normal" },
+          { value: "hard", label: "Hard" },
+        ],
+        defaultValue: "normal",
+      },
+      {
+        id: "time",
+        label: "Time",
+        choices: [
+          { value: "afternoon", label: "Afternoon" },
+          { value: "evening", label: "Evening" },
+        ],
+        defaultValue: "afternoon",
+      },
+    ],
+    load: () => import("./hide-seek").then((m) => m.default),
+  },
 ];
 
-export const ROADMAP = ["Ayo Olopon", "Tin game", "Hide & seek", "Dodgeball", "Egg & spoon", "Freeze", "Tinko tinko", "Ludo"];
+export const ROADMAP = ["Ayo Olopon", "Tin game", "Dodgeball", "Egg & spoon", "Freeze", "Tinko tinko", "Ludo"];
 
 export function getGame(slug: string): GameDefinition | undefined {
   return GAMES.find((g) => g.slug === slug);

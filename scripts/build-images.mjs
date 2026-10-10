@@ -15,6 +15,7 @@ const PHOTOS = [
   { name: "playground", src: "playground.png", aspect: 1, position: "centre" },
   { name: "sack-race", src: "sack-race.png", aspect: 4 / 3, position: "right top" },
   { name: "skipping", src: "skipping.png", aspect: 4 / 3, position: "centre" },
+  { name: "hide-seek", src: "hide-seek.png", aspect: 4 / 3, position: "centre" },
 ];
 const WIDTHS = [480, 960, 1600];
 
